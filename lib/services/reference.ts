@@ -6,14 +6,12 @@ import { recordAudit } from "./audit";
 
 // ---------------- Unit types (global reference) ----------------
 
-let unitTypeCache: { id: string; name: string; measurementKind: string }[] | null =
-  null;
-
+// Unit types are a tiny, fixed global table. We query them fresh rather than
+// caching process-wide: a stale cache would survive a DB reseed and hand out
+// unit-type ids that no longer exist (FK violation). Import runs load them once
+// via `prepare()`, so there's no per-row cost.
 export async function listUnitTypes() {
-  if (!unitTypeCache) {
-    unitTypeCache = await db.select().from(unitTypes).orderBy(asc(unitTypes.name));
-  }
-  return unitTypeCache;
+  return db.select().from(unitTypes).orderBy(asc(unitTypes.name));
 }
 
 const UNIT_ALIASES: Record<string, string> = {
@@ -236,9 +234,7 @@ export async function getDefaultLocation(ctx: ServiceCtx) {
   return row ?? (await createLocation(ctx, { name: "Main Warehouse" }));
 }
 
-/** Invalidate the unit-type cache (used after seeding). */
-export function _resetUnitTypeCache() {
-  unitTypeCache = null;
-}
+/** No-op retained for compatibility (unit types are no longer cached). */
+export function _resetUnitTypeCache() {}
 
 export { sql };
