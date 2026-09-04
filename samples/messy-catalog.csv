@@ -1,0 +1,11 @@
+Item Name,Item #,Product Category,Brand,UOM,Wholesale Price,Notes
+Pineapple Express 3.5g,FL-PE-35,Flower,Sungrown Farms,grams,$27.00,top seller
+Northern Lights 3.5g,FL-NL-35,Flower,Sungrown Farms,g,26,
+Mango Gummies 100mg,ED-MNG-100,Edibles,Cloud9 Labs,each,$19,vegan
+Cosmic Cart 1g,VP-CC-1,Vapes,Nebula Extracts,gram,42.5,new brand
+Mystery Flower,,Flower,Sungrown Farms,g,20,missing sku should error
+Bad Price Item,XX-BP-1,Edibles,Cloud9 Labs,each,twenty,price not a number
+No Unit Item,XX-NU-1,Concentrates,Kush Co,,30,missing unit should error
+Weird Unit,XX-WU-1,Flower,Kush Co,sploots,15,unknown unit should error
+Live Rosin 1g,CN-RS-1,Concentrates,Kush Co,gram,$60,duplicate sku updates existing
+Sundae Driver 3.5g,FL-SD-35,Flower,Nebula Extracts,grams,31,new vendor

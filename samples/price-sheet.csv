@@ -1,0 +1,7 @@
+SKU,Wholesale Price,Notes
+FL-BD-35,27.50,Q3 price bump
+FL-OG-35,31.00,
+PR-SD-1,7.50,promo
+VP-LR-1,44.00,new formulation
+CN-RS-1,58.00,
+UNKNOWN-SKU-9,99.00,should error - not in catalog

@@ -1,0 +1,4 @@
+Invoice Number,Amount Due,Due Date,Terms
+INV-1001,1250.00,2026-10-01,Net 30
+INV-1002,875.50,2026-10-15,Net 15
+INV-1003,4200.00,2026-11-01,Net 30
