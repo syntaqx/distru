@@ -111,6 +111,10 @@ Verified in this repo: mutation → interrupt with preview → **approve** write
 
 `runConversationTurn` is just "chat trigger → build AgentContext → run loop." A future **workflow** trigger builds the same context with a service actor and runs the same tools. The harness has no idea whether a human or a cron fired it. That is the whole point of the design.
 
+### 3.6 Tools beyond our own (external MCP servers)
+
+The brief's copilot uses the Distru MCP *plus the customer's own connected MCP servers* (QuickBooks, Sage, Metrc, Google Drive/Sheets, Calendar). The registry is built for exactly that: a tool is just `{ name, description, inputSchema, gate, execute }`, so tools sourced from an external MCP server register alongside the built-ins and inherit the **same gate/preview/audit** wrapper - a QuickBooks `create_invoice` would show the same Approve card as our `create_product`, and land in the same audit log. What's implemented here is the internal registry and our own MCP *server* (so others can drive Distru); the deferred piece is the MCP *client* that discovers a customer's connected servers and registers their tools. This is also what powers cross-tool **workflows** - e.g. the brief's "lab COA email → attach the PDF in Drive → mark the Distru inventory ready for sale" is just that same loop with an email trigger and tools from three MCP servers.
+
 ---
 
 ## 4. The product-import capability (flagship)
@@ -160,6 +164,8 @@ Modeled directly on Distru's real surface (`apidocs.distru.dev`, `mcp.distru.com
 
 All of these are implemented and were exercised with `curl` during development (see `README.md` → Verify).
 
+In production the harness's product tools would call Distru's real MCP/API; here they call the service layer directly because this repo *is* Distru. The tool contract is identical either way, so swapping the backing call is a per-tool change, not a harness change.
+
 ---
 
 ## 6. Edge cases & product decisions (with rationale)
@@ -188,14 +194,15 @@ All of these are implemented and were exercised with `curl` during development (
 - Multitenant auth + org onboarding; auto-seeded demo tenant.
 - Product/category/company/location/inventory domain + service layer + audit log.
 - Agentic harness: streaming loop, tool registry, HITL confirmation + `ask_user`, resumable across invocations, full persistence.
-- CSV/XLSX import end-to-end: **target auto-detection → "what do you want to do with this?" (`ask_user`) → retarget** → LLM mapping → chunked validation → partial commit → row-mapped error CSV. Two live targets (`products`, `customers`) prove the generic framework - the same upload, detected and routed to either.
+- CSV/XLSX import end-to-end: **target auto-detection (confident / ambiguous / none) → "what do you want to do with this?" (`ask_user`) → retarget** → LLM mapping → chunked validation → partial commit → row-mapped error CSV. **Five live targets** (`products`, `customers`, `vendors`, `price-list`, `inventory-count`) prove the generic framework - the same upload, detected and routed to the right one.
 - Distru-faithful public REST API (products/companies/categories/stock-adjustments), MCP server, `/upload-products`, HMAC webhooks.
 - App shell modeled on Distru's real modules: **Dashboard** (KPIs, module grid, live activity feed from the audit log), **Copilot** (streaming chat, tool cards, confirm/question cards, CSV upload), **Inventory**, **Companies** (CRM), and **Integrations** (mint tokens, API/MCP/webhook snippets). Sales Orders / Purchasing / Manufacturing / Compliance / Analytics are shown as honest "Preview" modules - the harness + service layer + public API/MCP are built to power them next.
 
 **Deferred (specced; seams already in place):**
 
 - Queue-backed processing for >10k rows and cron/webhook-triggered **workflows** (same chunk functions, different trigger).
-- More import targets beyond the `customers` stub; full public-API parity (orders/invoices/assemblies).
+- **MCP-client ingestion** of the customer's connected servers (Distru MCP + QuickBooks/Sage/Metrc/Drive/Sheets) into the tool registry - the copilot's full multi-MCP tool surface and the workflows' cross-tool actions. The registry + gate/preview/audit wrapper are already the seam for it (§3.6).
+- More import targets (purchase orders, sales orders); full public-API parity (orders/invoices/assemblies).
 - Webhook retry/backoff + a delivery-inspector UI; Vercel Blob for large source files.
 - RBAC beyond org membership; per-tenant model/effort tuning; an **eval harness** for column-mapping accuracy (the one place I'd invest next, since mapping quality is the product).
 
