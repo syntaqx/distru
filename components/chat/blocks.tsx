@@ -150,7 +150,7 @@ export function BlockView({ block }: { block: ChatBlock }) {
   if (block.type === "assistant") {
     return (
       <div className="copilot-md max-w-[85%] text-sm leading-relaxed">
-        <Streamdown shikiTheme={["github-light", "github-dark"]}>{block.text}</Streamdown>
+        <Streamdown shikiTheme={["github-light", "github-dark"]} controls={{ table: { fullscreen: false } }}>{block.text}</Streamdown>
       </div>
     );
   }

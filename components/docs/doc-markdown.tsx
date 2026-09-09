@@ -51,7 +51,13 @@ const docComponents: Components = {
 /** Render one markdown chunk of a doc article (prose, tables). */
 export function DocMarkdown({ md }: { md: string }) {
   return (
-    <Streamdown components={docComponents} linkSafety={{ enabled: false }}>
+    <Streamdown
+      components={docComponents}
+      linkSafety={{ enabled: false }}
+      // Streamdown's table "fullscreen" overlay doesn't get a solid background in
+      // our theme (it bleeds through the page); disable it - docs tables are small.
+      controls={{ table: { fullscreen: false } }}
+    >
       {md}
     </Streamdown>
   );

@@ -83,7 +83,7 @@ export function RunDetail({
 
       {run.summary && (
         <div className="copilot-md rounded-lg border p-3 text-sm">
-          <Streamdown shikiTheme={["github-light", "github-dark"]}>{run.summary}</Streamdown>
+          <Streamdown shikiTheme={["github-light", "github-dark"]} controls={{ table: { fullscreen: false } }}>{run.summary}</Streamdown>
         </div>
       )}
 
@@ -164,7 +164,7 @@ function StepRow({ nr }: { nr: NodeRun }) {
                 </div>
               ) : it.kind === "assistant" && it.text ? (
                 <div key={i} className="copilot-md text-sm">
-                  <Streamdown shikiTheme={["github-light", "github-dark"]}>{it.text}</Streamdown>
+                  <Streamdown shikiTheme={["github-light", "github-dark"]} controls={{ table: { fullscreen: false } }}>{it.text}</Streamdown>
                 </div>
               ) : null,
             )

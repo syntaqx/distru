@@ -141,7 +141,7 @@ export function ReportsView({ initial }: { initial: ReportLite[] }) {
                 </div>
               ) : report.format === "markdown" ? (
                 <div className="copilot-md text-sm leading-relaxed">
-                  <Streamdown shikiTheme={["github-light", "github-dark"]}>{report.content}</Streamdown>
+                  <Streamdown shikiTheme={["github-light", "github-dark"]} controls={{ table: { fullscreen: false } }}>{report.content}</Streamdown>
                 </div>
               ) : (
                 <pre className="overflow-x-auto rounded-xl border p-4 text-xs" style={{ background: "var(--color-surface)" }}>
