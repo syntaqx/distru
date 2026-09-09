@@ -1,5 +1,18 @@
 @import "tailwindcss";
-@source "../node_modules/streamdown/dist/index.js";
+@source "../node_modules/streamdown/dist";
+
+/*
+ * Make Tailwind's `dark:` variant match how the app actually themes: an explicit
+ * data-theme="dark", or the OS in dark mode when no explicit light choice is set.
+ * Without this, `dark:` utilities (including Streamdown's shiki token colors) only
+ * fire on prefers-color-scheme and miss the in-app theme toggle.
+ */
+@custom-variant dark {
+  &:where([data-theme="dark"], [data-theme="dark"] *) { @slot; }
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme="light"]), :root:not([data-theme="light"]) *) { @slot; }
+  }
+}
 
 @theme {
   /* Distru-flavored light palette: white/sage ground, deep teal accent, slate text. */
@@ -22,9 +35,45 @@
   --radius: 0.7rem;
 }
 
+/* Dark palette. Default (no data-theme) follows the OS; data-theme forces it. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-bg: #0b0e0d;
+    --color-surface: #121615;
+    --color-surface2: #1b201e;
+    --color-border: #2a302e;
+    --color-fg: #e6ede9;
+    --color-muted: #93a29b;
+    --color-accent: #34c48f;
+    --color-accent2: #2aa87a;
+    --color-accentfg: #05140d;
+    --color-danger: #f2635a;
+    --color-warn: #d6a419;
+    --color-info: #58a6ff;
+  }
+}
+:root[data-theme="dark"] {
+  --color-bg: #0b0e0d;
+  --color-surface: #121615;
+  --color-surface2: #1b201e;
+  --color-border: #2a302e;
+  --color-fg: #e6ede9;
+  --color-muted: #93a29b;
+  --color-accent: #34c48f;
+  --color-accent2: #2aa87a;
+  --color-accentfg: #05140d;
+  --color-danger: #f2635a;
+  --color-warn: #d6a419;
+  --color-info: #58a6ff;
+}
+
 html,
 body {
   height: 100%;
+}
+
+html {
+  color-scheme: light dark;
 }
 
 body {
@@ -50,6 +99,103 @@ body {
   50% {
     opacity: 0.35;
   }
+}
+
+/* Vercel-style sidebar context swap: light fade + slight slide. */
+@keyframes navIn {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.nav-swap {
+  animation: navIn 160ms ease-out;
+}
+
+/* Copilot markdown: dark, readable body text; accent only for links/code. */
+.copilot-md {
+  color: var(--color-fg);
+}
+.copilot-md :where(p, li, h1, h2, h3, h4, h5, blockquote, td, th, ul, ol) {
+  color: var(--color-fg) !important;
+}
+.copilot-md :where(a) {
+  color: var(--color-accent) !important;
+  text-decoration: underline;
+}
+/* Inline code only: subtle chip. Block code (pre > code) keeps its syntax colors. */
+.copilot-md :where(:not(pre) > code) {
+  background: var(--color-surface2) !important;
+  color: var(--color-fg) !important;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 0.08em 0.36em;
+  font-size: 0.85em;
+  font-weight: 500;
+}
+
+/* Streamdown tables: the default header fill is `bg-muted` (a text color), which
+   reads as a washed-out tan over the dark ground. Use a real surface tone. */
+.copilot-md [data-streamdown="table-header"] {
+  background: var(--color-surface2) !important;
+}
+.copilot-md [data-streamdown="table-header-cell"] {
+  color: var(--color-fg) !important;
+}
+
+/* Server-highlighted (shiki) code blocks in docs. Light colors are inline from
+   shiki; swap to the dark palette when the app is in dark mode. */
+.copilot-md .shiki {
+  margin: 0;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  overflow-x: auto;
+  font-size: 0.8rem;
+  line-height: 1.7;
+}
+.copilot-md .shiki code {
+  background: none !important;
+  border: 0;
+  padding: 0;
+  font-weight: 400;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: inherit;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .copilot-md .shiki {
+    background-color: var(--shiki-dark-bg) !important;
+  }
+  :root:not([data-theme="light"]) .copilot-md .shiki,
+  :root:not([data-theme="light"]) .copilot-md .shiki span {
+    color: var(--shiki-dark) !important;
+  }
+}
+:root[data-theme="dark"] .copilot-md .shiki {
+  background-color: var(--shiki-dark-bg) !important;
+}
+:root[data-theme="dark"] .copilot-md .shiki,
+:root[data-theme="dark"] .copilot-md .shiki span {
+  color: var(--shiki-dark) !important;
+}
+
+/* Client-rendered mermaid diagrams in docs. */
+.copilot-md .doc-mermaid {
+  display: flex;
+  justify-content: center;
+  padding: 1.25rem;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+  overflow-x: auto;
+}
+.copilot-md .doc-mermaid svg {
+  max-width: 100%;
+  height: auto;
 }
 
 * {
@@ -101,6 +247,51 @@ body {
   .input:focus {
     border-color: var(--color-accent);
     box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-accent) 15%, transparent);
+  }
+  /* Radix Select — trigger mirrors .input, dropdown uses the design tokens. */
+  .select-trigger {
+    @apply flex w-full items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm outline-none;
+    background: var(--color-surface);
+    color: var(--color-fg);
+  }
+  .select-trigger:focus-visible,
+  .select-trigger[data-state="open"] {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-accent) 15%, transparent);
+  }
+  .select-trigger[data-placeholder] > span:first-child {
+    color: var(--color-muted);
+  }
+  .select-trigger:disabled {
+    @apply cursor-not-allowed opacity-60;
+  }
+  .select-content {
+    z-index: 60;
+    min-width: var(--radix-select-trigger-width);
+    max-height: var(--radix-select-content-available-height);
+    overflow: hidden;
+    border-radius: 0.6rem;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    box-shadow: 0 12px 32px -8px rgb(0 0 0 / 0.35), 0 0 0 1px rgb(0 0 0 / 0.02);
+  }
+  .select-item {
+    @apply relative flex cursor-pointer select-none items-center rounded-md py-1.5 pl-3 pr-8 text-sm outline-none;
+    color: var(--color-fg);
+  }
+  .select-item[data-highlighted] {
+    background: var(--color-surface2);
+  }
+  .select-item[data-state="checked"] {
+    color: var(--color-accent);
+    font-weight: 500;
+  }
+  .select-item[data-disabled] {
+    @apply pointer-events-none opacity-40;
+  }
+  .select-indicator {
+    @apply absolute right-2 inline-flex items-center;
+    color: var(--color-accent);
   }
   .badge {
     @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium border;

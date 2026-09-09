@@ -1,5 +1,5 @@
-import type { ServiceCtx } from "@/lib/services/context";
-import { createCompany, listCompanies } from "@/lib/services/reference";
+import type { ServiceCtx } from "@/lib/modules/shared";
+import { createCompany, listCompanies } from "@/lib/modules/catalog";
 import type { ImportTarget } from "../target";
 import type { CanonicalField, RowError } from "../types";
 

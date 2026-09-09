@@ -7,10 +7,14 @@
  *
  * Run: npm run db:seed  (Postgres must be up: docker compose up -d)
  */
-try {
-  process.loadEnvFile(".env");
-} catch {
-  // .env optional; falls back to defaults / real env.
+// In Docker, compose sets DATABASE_URL (+ env_file); only load .env on the host,
+// and never let it override an already-set DATABASE_URL.
+if (!process.env.DATABASE_URL) {
+  try {
+    process.loadEnvFile(".env");
+  } catch {
+    // .env optional; falls back to defaults / real env.
+  }
 }
 
 import { eq } from "drizzle-orm";

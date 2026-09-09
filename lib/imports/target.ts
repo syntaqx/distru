@@ -1,4 +1,4 @@
-import type { ServiceCtx } from "@/lib/services/context";
+import type { ServiceCtx } from "@/lib/modules/shared";
 import type { CanonicalField, RowError } from "./types";
 
 export type NewReference = { kind: string; value: string };

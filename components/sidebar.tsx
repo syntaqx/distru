@@ -1,98 +1,261 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { Boxes, Building2, LayoutDashboard, LogOut, Sparkles, Zap } from "lucide-react";
-import { signOut } from "@/lib/auth-client";
-import { Logo } from "@/components/brand";
+import { usePathname } from "next/navigation";
+import {
+  ArrowLeft,
+  BarChart3,
+  BookOpen,
+  Boxes,
+  Building2,
+  ClipboardList,
+  CreditCard,
+  Factory,
+  FileText,
+  KeyRound,
+  LayoutDashboard,
+  type LucideIcon,
+  Settings,
+  ShieldCheck,
+  ShoppingCart,
+  Sprout,
+  Tag,
+  Truck,
+  Users,
+  Webhook,
+  Workflow,
+  Zap,
+} from "lucide-react";
+import { listDocs } from "@/lib/docs/content";
+import { UserMenu } from "@/components/user-menu";
 
-const NAV = [
-  { href: "/dashboard", label: "Dashboard", Icon: LayoutDashboard },
-  { href: "/inventory", label: "Inventory", Icon: Boxes },
-  { href: "/companies", label: "Companies", Icon: Building2 },
-  { href: "/integrations", label: "Integrations", Icon: Zap },
+type Item = { label: string; Icon: LucideIcon; href?: string };
+type Group = { label: string; items: Item[] };
+
+const MAIN: Group[] = [
+  {
+    label: "Operate",
+    items: [
+      { label: "Dashboard", Icon: LayoutDashboard, href: "/dashboard" },
+      { label: "Inventory", Icon: Boxes, href: "/inventory" },
+      { label: "Categories", Icon: Tag, href: "/categories" },
+      { label: "Companies", Icon: Building2, href: "/companies" },
+      { label: "Sales", Icon: ShoppingCart, href: "/sales" },
+      { label: "Automations", Icon: Workflow, href: "/automations" },
+    ],
+  },
+  // Stubbed modules: one row each (not expanded sub-navs) so the shell shows the
+  // full product surface without a massive sidebar. Each lands here when built.
+  {
+    label: "Modules",
+    items: [
+      { label: "Purchasing", Icon: Truck },
+      { label: "Manufacturing", Icon: Factory },
+      { label: "Compliance", Icon: ShieldCheck },
+      { label: "Cultivation", Icon: Sprout },
+      { label: "Insights", Icon: BarChart3 },
+    ],
+  },
 ];
 
+const SETTINGS: Item[] = [
+  { label: "General", Icon: Settings, href: "/settings" },
+  { label: "Members", Icon: Users, href: "/settings/members" },
+  { label: "API tokens", Icon: KeyRound, href: "/settings/api-tokens" },
+  { label: "Webhooks", Icon: Webhook, href: "/settings/webhooks" },
+  { label: "Integrations", Icon: Zap, href: "/integrations" },
+  { label: "Billing", Icon: CreditCard },
+  { label: "Notifications", Icon: FileText },
+  { label: "Audit log", Icon: ClipboardList },
+];
+
+function Row({ item, active }: { item: Item; active?: boolean }) {
+  const { Icon } = item;
+  const disabled = !item.href;
+  // Colors live in classes (not inline) for the inactive state so the hover
+  // variants actually win - inline styles would override :hover.
+  const cls = active
+    ? "text-fg"
+    : disabled
+      ? "text-muted opacity-55"
+      : "text-muted hover:bg-surface2 hover:text-fg";
+  const inner = (
+    <div
+      className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors ${cls}`}
+      style={active ? { background: "var(--color-surface2)" } : undefined}
+    >
+      <Icon
+        size={16}
+        style={{ color: active ? "var(--color-accent)" : undefined }}
+      />
+      <span>{item.label}</span>
+      {disabled && (
+        <span className="ml-auto rounded bg-surface2 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-muted">
+          Soon
+        </span>
+      )}
+    </div>
+  );
+  if (!item.href)
+    return (
+      <div title="Coming soon" aria-disabled className="cursor-not-allowed">
+        {inner}
+      </div>
+    );
+  return <Link href={item.href}>{inner}</Link>;
+}
+
+function BackHeader({ label }: { label: string }) {
+  return (
+    <Link
+      href="/dashboard"
+      className="mb-1 flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted transition-colors hover:text-fg"
+    >
+      <ArrowLeft size={15} /> {label}
+    </Link>
+  );
+}
+
 export function Sidebar({
-  orgName,
   userName,
   userEmail,
-  onToggleCopilot,
-  copilotOpen,
 }: {
-  orgName: string;
   userName: string;
   userEmail: string;
-  onToggleCopilot: () => void;
-  copilotOpen: boolean;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
+  const context = pathname.startsWith("/settings")
+    ? "settings"
+    : pathname.startsWith("/docs")
+      ? "docs"
+      : "main";
 
   return (
-    <aside className="flex w-60 shrink-0 flex-col border-r" style={{ background: "var(--color-surface)" }}>
-      <div className="p-4">
-        <Logo />
-      </div>
-      <div className="mx-3 mb-2 rounded-lg border px-3 py-2" style={{ background: "var(--color-bg)" }}>
-        <div className="text-[11px] uppercase tracking-wide text-muted">Workspace</div>
-        <div className="truncate text-sm font-medium">{orgName}</div>
-      </div>
+    <aside
+      className="flex w-64 shrink-0 flex-col border-r"
+      style={{ background: "var(--color-surface)" }}
+    >
+      <nav className="flex-1 overflow-y-auto px-3 py-3">
+        <div key={context} className="nav-swap space-y-4">
+          {context === "settings" && (
+            <div className="space-y-0.5">
+              <BackHeader label="Settings" />
+              {SETTINGS.map((item) => (
+                <Row
+                  key={item.label}
+                  item={item}
+                  active={item.href ? pathname === item.href : false}
+                />
+              ))}
+            </div>
+          )}
 
-      <div className="px-3 pb-1">
-        <button
-          onClick={onToggleCopilot}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors"
-          style={
-            copilotOpen
-              ? { background: "var(--color-accent)", color: "var(--color-accentfg)" }
-              : { background: "var(--color-surface2)", color: "var(--color-fg)" }
-          }
-          title="Toggle Copilot (⌘/Ctrl+J)"
-        >
-          <Sparkles size={16} />
-          Copilot
-          <span className="ml-auto text-[11px] opacity-70">⌘J</span>
-        </button>
-      </div>
+          {context === "docs" &&
+            (() => {
+              const docLink = (d: { slug: string; title: string }) => {
+                const href =
+                  d.slug === "overview" ? "/docs" : `/docs/${d.slug}`;
+                const active = pathname === href;
+                return (
+                  <Link
+                    key={d.slug}
+                    href={href}
+                    className={`block rounded-lg px-3 py-2 text-sm transition-colors ${
+                      active
+                        ? "text-fg"
+                        : "text-muted hover:bg-surface2 hover:text-fg"
+                    }`}
+                    style={
+                      active
+                        ? { background: "var(--color-surface2)" }
+                        : undefined
+                    }
+                  >
+                    {d.title}
+                  </Link>
+                );
+              };
+              const all = listDocs();
+              // Product docs render as one flat list; everything else (the
+              // engineering/architecture tier) groups by section so the
+              // two-piece showcase - Platform vs Copilot - reads in the nav.
+              const PRODUCT_SECTIONS = [
+                "Getting started",
+                "Catalog",
+                "Selling",
+                "Importing data",
+                "Copilot",
+                "Developers",
+              ];
+              const product = all.filter((d) =>
+                PRODUCT_SECTIONS.includes(d.section),
+              );
+              const engineering = all.filter(
+                (d) => !PRODUCT_SECTIONS.includes(d.section),
+              );
+              const engSections: string[] = [];
+              for (const d of engineering)
+                if (!engSections.includes(d.section))
+                  engSections.push(d.section);
+              return (
+                <div className="space-y-5">
+                  <div className="space-y-0.5">
+                    <BackHeader label="Docs" />
+                    {product.map(docLink)}
+                  </div>
+                  {engSections.map((section) => (
+                    <div key={section} className="space-y-0.5">
+                      <div className="px-3 pb-1 text-[11px] font-medium uppercase tracking-wide text-muted">
+                        {section}
+                      </div>
+                      {engineering
+                        .filter((d) => d.section === section)
+                        .map(docLink)}
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
 
-      <nav className="flex-1 space-y-1 p-3">
-        {NAV.map((item) => {
-          const active = pathname.startsWith(item.href);
-          const { Icon } = item;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors"
-              style={
-                active
-                  ? { background: "var(--color-surface2)", color: "var(--color-fg)" }
-                  : { color: "var(--color-muted)" }
-              }
-            >
-              <Icon size={16} style={{ color: active ? "var(--color-accent)" : undefined }} />
-              {item.label}
-            </Link>
-          );
-        })}
+          {context === "main" && (
+            <>
+              {MAIN.map((group) => (
+                <div key={group.label} className="space-y-0.5">
+                  <div className="px-3 pb-1 text-[11px] font-medium uppercase tracking-wide text-muted">
+                    {group.label}
+                  </div>
+                  {group.items.map((item) => (
+                    <Row
+                      key={item.label}
+                      item={item}
+                      active={
+                        item.href ? pathname.startsWith(item.href) : false
+                      }
+                    />
+                  ))}
+                </div>
+              ))}
+              <div className="space-y-0.5 border-t pt-3">
+                <Row
+                  item={{ label: "Docs", Icon: BookOpen, href: "/docs" }}
+                  active={false}
+                />
+                <Row
+                  item={{
+                    label: "Settings",
+                    Icon: Settings,
+                    href: "/settings",
+                  }}
+                  active={false}
+                />
+              </div>
+            </>
+          )}
+        </div>
       </nav>
 
-      <div className="border-t p-3">
-        <div className="mb-2 px-1">
-          <div className="truncate text-sm font-medium">{userName}</div>
-          <div className="truncate text-xs text-muted">{userEmail}</div>
-        </div>
-        <button
-          className="btn btn-outline w-full text-sm"
-          onClick={async () => {
-            await signOut();
-            router.push("/sign-in");
-            router.refresh();
-          }}
-        >
-          <LogOut size={15} /> Sign out
-        </button>
+      <div className="border-t p-2">
+        <UserMenu userName={userName} userEmail={userEmail} />
       </div>
     </aside>
   );

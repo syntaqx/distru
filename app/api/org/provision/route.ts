@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { getOrgContext } from "@/lib/session";
 import { seedUnitTypes, provisionOrgSampleData } from "@/lib/seed-data";
-import { getDefaultLocation } from "@/lib/services/reference";
-import { systemCtx } from "@/lib/services/context";
+import { getDefaultLocation } from "@/lib/modules/catalog";
+import { systemCtx } from "@/lib/modules/shared";
 
 export const maxDuration = 120;
 

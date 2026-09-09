@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getOrgContext } from "@/lib/session";
-import { verifyBearerToken } from "@/lib/services/tokens";
-import type { ServiceCtx } from "@/lib/services/context";
+import { verifyBearerToken } from "@/lib/modules/platform";
+import type { ServiceCtx } from "@/lib/modules/shared";
 import { parseTabular } from "@/lib/imports/parse";
 import { deterministicMapping } from "@/lib/imports/mapping";
 import { productsTarget } from "@/lib/imports/targets/products";
@@ -10,7 +10,7 @@ import {
   createImportJob,
   insertRows,
   updateJob,
-} from "@/lib/services/imports";
+} from "@/lib/modules/imports";
 import { commitImport, validateImport } from "@/lib/imports/pipeline";
 import { buildErrorCsv } from "@/lib/imports/errors-csv";
 

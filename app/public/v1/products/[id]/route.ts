@@ -1,5 +1,5 @@
 import { authenticate, distruError, requireScope } from "@/lib/public-api";
-import { getProduct, productToApi } from "@/lib/services/products";
+import { getProduct, productToApi } from "@/lib/modules/catalog";
 
 export async function GET(
   req: Request,
@@ -11,6 +11,6 @@ export async function GET(
   if (scopeErr) return scopeErr;
   const { id } = await params;
   const product = await getProduct(auth.ctx, id);
-  if (!product) return distruError(404, "Product not found", ["id"]);
+  if (!product) return distruError(404, "Product not found", ["id"], "path");
   return Response.json({ data: productToApi(product) });
 }

@@ -5,18 +5,22 @@
  *
  * Run: npm run smoke   (after docker compose up + db:seed)
  */
-try {
-  process.loadEnvFile(".env");
-} catch {}
+if (!process.env.DATABASE_URL) {
+  try {
+    process.loadEnvFile(".env");
+  } catch {}
+}
 
 import { readFileSync } from "node:fs";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { organization } from "@/db/schema";
-import { systemCtx } from "@/lib/services/context";
-import { listProducts, createProduct, getProductBySku } from "@/lib/services/products";
-import { adjustInventory, getOnHand } from "@/lib/services/inventory";
-import { getDefaultLocation, resolveUnitType } from "@/lib/services/reference";
+import { systemCtx } from "@/lib/modules/shared";
+import { listProducts, createProduct, getProductBySku } from "@/lib/modules/catalog";
+import { adjustInventory, getOnHand } from "@/lib/modules/inventory";
+import { getDefaultLocation, resolveUnitType, findOrCreateCustomer } from "@/lib/modules/catalog";
+import { createOrder } from "@/lib/modules/sales";
+import { createInvoiceForOrder, recordPayment } from "@/lib/modules/sales";
 import { parseTabular } from "@/lib/imports/parse";
 import { deterministicMapping } from "@/lib/imports/mapping";
 import { productsTarget } from "@/lib/imports/targets/products";
@@ -25,10 +29,10 @@ import {
   createImportJob,
   insertRows,
   updateJob,
-} from "@/lib/services/imports";
+} from "@/lib/modules/imports";
 import { validateImport, commitImport } from "@/lib/imports/pipeline";
 import { buildErrorCsv } from "@/lib/imports/errors-csv";
-import { createToken } from "@/lib/services/tokens";
+import { createToken } from "@/lib/modules/platform";
 
 function log(label: string, value: unknown) {
   console.log(`  ${label.padEnd(26)} ${JSON.stringify(value)}`);
@@ -124,7 +128,38 @@ async function main() {
   const after = await listProducts(ctx, { limit: 5 });
   log("products (total)", after.total);
 
-  console.log("\n5. Mint API token for HTTP testing");
+  console.log("\n5. Sales order → inventory decrement → invoice → payment");
+  {
+    const seller = await getProductBySku(ctx, "FL-BD-35");
+    if (seller) {
+      const loc = await getDefaultLocation(ctx);
+      const before = await getOnHand(ctx, seller.product.id, loc.id);
+      const customer = await findOrCreateCustomer(ctx, "Smoke Test Dispensary");
+      const order = await createOrder(ctx, {
+        customerId: customer.id,
+        status: "PROCESSING",
+        items: [
+          {
+            productId: seller.product.id,
+            sku: seller.product.sku,
+            name: seller.product.name,
+            quantity: 3,
+            unitPrice: Number(seller.product.unitPrice ?? 0),
+          },
+        ],
+      });
+      const afterSale = await getOnHand(ctx, seller.product.id, loc.id);
+      log("order", { number: order.order.orderNumber, total: order.total });
+      log("on-hand", { before, afterSale, decremented: before - afterSale });
+      const invoice = await createInvoiceForOrder(ctx, order.order.id);
+      const paid = await recordPayment(ctx, invoice.invoice.id, { amount: order.total, method: "cash" });
+      log("invoice", { number: paid.invoice.invoiceNumber, status: paid.invoice.status });
+    } else {
+      log("order", "seed product FL-BD-35 missing; skipped");
+    }
+  }
+
+  console.log("\n6. Mint API token for HTTP testing");
   const { token } = await createToken(ctx, { name: "smoke-test" });
   console.log(`  TOKEN=${token}`);
 

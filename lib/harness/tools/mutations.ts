@@ -3,20 +3,55 @@ import { defineTool } from "../tool";
 import type { HarnessToolPreview } from "../types";
 import {
   archiveProduct,
+  bulkUpdateProducts,
+  countProducts,
   createProduct,
+  productIdsMatching,
   updateProduct,
-} from "@/lib/services/products";
+  type BulkProductFilter,
+  type ProductInput,
+} from "@/lib/modules/catalog";
 import {
   createCategory,
   createCompany,
+  findCategoryByName,
+  findCompanyByName,
   findOrCreateCategory,
   findOrCreateCompany,
   findOrCreateLocation,
   getDefaultLocation,
   resolveUnitType,
-} from "@/lib/services/reference";
-import { adjustInventory, setOnHand } from "@/lib/services/inventory";
+} from "@/lib/modules/catalog";
+import { adjustInventory, bulkSetOnHand, setOnHand } from "@/lib/modules/inventory";
+import type { AgentContext } from "../tool";
 import { resolveProduct } from "./_helpers";
+
+/**
+ * Resolve a bulk "scope" (all / category / vendor / search) to a product filter.
+ * Returns an error string the tool surfaces if the named category/vendor is unknown.
+ */
+async function resolveBulkFilter(
+  ctx: AgentContext,
+  scope: "all" | "category" | "vendor" | "search",
+  scopeValue: string | undefined,
+  includeArchived: boolean | undefined,
+): Promise<{ filter: BulkProductFilter; label: string } | { error: string }> {
+  const base: BulkProductFilter = includeArchived ? {} : { status: "ACTIVE" };
+  if (scope === "all")
+    return { filter: base, label: includeArchived ? "all products" : "all active products" };
+  if (!scopeValue) return { error: `scope_value is required when scope is "${scope}".` };
+  if (scope === "category") {
+    const c = await findCategoryByName(ctx.service, scopeValue);
+    if (!c) return { error: `No category named "${scopeValue}".` };
+    return { filter: { ...base, categoryId: c.id }, label: `category "${c.name}"` };
+  }
+  if (scope === "vendor") {
+    const v = await findCompanyByName(ctx.service, scopeValue);
+    if (!v) return { error: `No vendor/brand named "${scopeValue}".` };
+    return { filter: { ...base, vendorId: v.id }, label: `vendor "${v.name}"` };
+  }
+  return { filter: { ...base, search: scopeValue }, label: `products matching "${scopeValue}"` };
+}
 
 function confirm(
   title: string,
@@ -308,12 +343,136 @@ export const createVendorTool = defineTool({
   },
 });
 
+const bulkScope = z.object({
+  scope: z
+    .enum(["all", "category", "vendor", "search"])
+    .describe("Which products to affect. Use this instead of updating one at a time."),
+  scope_value: z
+    .string()
+    .optional()
+    .describe("Category name, vendor/brand name, or search text. Required unless scope is 'all'."),
+  include_archived: z
+    .boolean()
+    .optional()
+    .describe("Include archived products (default false: active only)."),
+});
+
+export const bulkUpdateProductsTool = defineTool({
+  name: "bulk_update_products",
+  description:
+    "Update the same field(s) on MANY products at once in a single approval - " +
+    "e.g. 'set every product's price to 1000', or 'archive all products from vendor X'. " +
+    "Prefer this over calling update_product repeatedly. Choose the products with " +
+    "scope (all / category / vendor / search) and provide the fields to set.",
+  gate: "confirmation",
+  inputSchema: bulkScope.extend({
+    set: z
+      .object({
+        unit_price: z.number().optional(),
+        category: z.string().optional(),
+        vendor: z.string().optional(),
+        tracking_method: z.enum(["PACKAGE", "PRODUCT", "BATCH"]).optional(),
+        status: z.enum(["ACTIVE", "ARCHIVED"]).optional(),
+      })
+      .describe("Fields to set on every matched product."),
+  }),
+  async buildPreview(input, ctx) {
+    const r = await resolveBulkFilter(ctx, input.scope, input.scope_value, input.include_archived);
+    if ("error" in r) return confirm("Bulk update products", r.error, [], "high");
+    const n = await countProducts(ctx.service, r.filter);
+    const changes: { label: string; value: string }[] = [];
+    if (input.set.unit_price != null)
+      changes.push({ label: "Unit price", value: `$${input.set.unit_price}` });
+    if (input.set.category) changes.push({ label: "Category", value: input.set.category });
+    if (input.set.vendor) changes.push({ label: "Vendor/Brand", value: input.set.vendor });
+    if (input.set.tracking_method)
+      changes.push({ label: "Tracking", value: input.set.tracking_method });
+    if (input.set.status) changes.push({ label: "Status", value: input.set.status });
+    return confirm(
+      "Bulk update products",
+      `Update ${n} product${n === 1 ? "" : "s"} (${r.label}).`,
+      [{ label: "Scope", value: r.label }, { label: "Products", value: String(n) }, ...changes],
+      "high",
+    );
+  },
+  async execute(input, ctx) {
+    const r = await resolveBulkFilter(ctx, input.scope, input.scope_value, input.include_archived);
+    if ("error" in r) return { ok: false, summary: r.error };
+    const set: ProductInput = {};
+    if (input.set.unit_price != null) set.unitPrice = input.set.unit_price;
+    if (input.set.tracking_method) set.inventoryTrackingMethod = input.set.tracking_method;
+    if (input.set.status) set.status = input.set.status;
+    if (input.set.category)
+      set.categoryId = (await findOrCreateCategory(ctx.service, input.set.category)).id;
+    if (input.set.vendor)
+      set.vendorId = (await findOrCreateCompany(ctx.service, input.set.vendor)).id;
+    if (Object.keys(set).length === 0)
+      return { ok: false, summary: "Nothing to change; specify at least one field in set." };
+    const { updated } = await bulkUpdateProducts(ctx.service, { filter: r.filter, set });
+    return {
+      ok: true,
+      summary: `Updated ${updated} product${updated === 1 ? "" : "s"} (${r.label}).`,
+      data: { updated },
+    };
+  },
+});
+
+export const bulkSetOnHandTool = defineTool({
+  name: "bulk_set_on_hand",
+  description:
+    "Set on-hand quantity to the same value for MANY products at once, in a single " +
+    "approval - e.g. 'set on-hand to 0 for every product in category Flower'. " +
+    "Choose the products with scope; one ledger movement is posted per product.",
+  gate: "confirmation",
+  inputSchema: bulkScope.extend({
+    quantity: z.number().describe("Absolute on-hand target for every matched product."),
+    location: z.string().optional(),
+  }),
+  async buildPreview(input, ctx) {
+    const r = await resolveBulkFilter(ctx, input.scope, input.scope_value, input.include_archived);
+    if ("error" in r) return confirm("Bulk set on-hand", r.error, [], "high");
+    const n = await countProducts(ctx.service, r.filter);
+    return confirm(
+      "Bulk set on-hand",
+      `Set on-hand to ${input.quantity} for ${n} product${n === 1 ? "" : "s"} (${r.label}).`,
+      [
+        { label: "Scope", value: r.label },
+        { label: "Products", value: String(n) },
+        { label: "Target quantity", value: String(input.quantity) },
+        { label: "Location", value: input.location ?? "default" },
+      ],
+      "high",
+    );
+  },
+  async execute(input, ctx) {
+    const r = await resolveBulkFilter(ctx, input.scope, input.scope_value, input.include_archived);
+    if ("error" in r) return { ok: false, summary: r.error };
+    const ids = await productIdsMatching(ctx.service, r.filter);
+    if (ids.length === 0) return { ok: false, summary: `No products match ${r.label}.` };
+    const location = input.location
+      ? await findOrCreateLocation(ctx.service, input.location)
+      : await getDefaultLocation(ctx.service);
+    const { updated } = await bulkSetOnHand(ctx.service, {
+      productIds: ids,
+      locationId: location.id,
+      target: input.quantity,
+    });
+    return {
+      ok: true,
+      summary: `Set on-hand to ${input.quantity} for ${updated} product${updated === 1 ? "" : "s"} at ${location.name}.`,
+      data: { updated },
+    };
+  },
+});
+
 export const mutationTools = [
   createProductTool,
   updateProductTool,
   archiveProductTool,
   adjustInventoryTool,
   setOnHandTool,
+  bulkUpdateProductsTool,
+  bulkSetOnHandTool,
   createCategoryTool,
   createVendorTool,
 ];

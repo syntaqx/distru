@@ -1,7 +1,7 @@
-import type { ServiceCtx } from "@/lib/services/context";
-import { productSkuMap } from "@/lib/services/products";
-import { getDefaultLocation } from "@/lib/services/reference";
-import { setOnHand } from "@/lib/services/inventory";
+import type { ServiceCtx } from "@/lib/modules/shared";
+import { productSkuMap } from "@/lib/modules/catalog";
+import { getDefaultLocation } from "@/lib/modules/catalog";
+import { setOnHand } from "@/lib/modules/inventory";
 import type { ImportTarget } from "../target";
 import type { CanonicalField, RowError } from "../types";
 

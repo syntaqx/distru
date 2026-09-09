@@ -3,7 +3,7 @@ import { getOrgContext } from "@/lib/session";
 import {
   createConversation,
   listConversations,
-} from "@/lib/services/conversations";
+} from "@/lib/harness/conversations";
 
 export async function GET() {
   const ctx = await getOrgContext();

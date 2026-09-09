@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { defineTool } from "../tool";
-import { getFile, getJob, updateJob } from "@/lib/services/imports";
+import { getFile, getJob, updateJob } from "@/lib/modules/imports";
 import { getTarget, listTargets } from "@/lib/imports/registry";
 import { classifyDetection } from "@/lib/imports/detect";
 import { proposeMapping } from "@/lib/imports/mapping";

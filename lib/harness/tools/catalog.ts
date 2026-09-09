@@ -4,13 +4,13 @@ import {
   getProduct,
   getProductBySku,
   listProducts,
-} from "@/lib/services/products";
+} from "@/lib/modules/catalog";
 import {
   listCategories,
   listCompanies,
   listLocations,
-} from "@/lib/services/reference";
-import { getOnHand, onHandByProduct } from "@/lib/services/inventory";
+} from "@/lib/modules/catalog";
+import { getOnHand, onHandByProduct } from "@/lib/modules/inventory";
 import { productSummary, resolveProduct } from "./_helpers";
 
 export const searchProducts = defineTool({

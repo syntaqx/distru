@@ -1,0 +1,11 @@
+Order #,Customer,Item Code,Qty,Price
+SO-1001,Green Leaf Dispensary,FL-BD-35,10,25.00
+SO-1001,Green Leaf Dispensary,FL-OG-35,5,30.00
+SO-1002,Valley Wellness,ED-GUM-100,24,18.00
+SO-1002,Valley Wellness,ED-CHOC-100,12,20.00
+SO-1002,Valley Wellness,VP-LR-1,6,40.00
+SO-1003,High Desert Collective,PR-SD-1,50,8.00
+SO-1003,High Desert Collective,CN-SH-1,8,30.00
+SO-1004,Coastal Cannabis Co,FL-WC-35,15,32.00
+SO-1004,Coastal Cannabis Co,FL-GDP-35,10,28.00
+SO-1005,Green Leaf Dispensary,VP-DISP-05,20,35.00

@@ -4,8 +4,8 @@ import {
   appendMessage,
   getConversation,
   renameConversation,
-} from "@/lib/services/conversations";
-import { getFile, getJob } from "@/lib/services/imports";
+} from "@/lib/harness/conversations";
+import { getFile, getJob } from "@/lib/modules/imports";
 import { runConversationTurn } from "@/lib/harness/runner";
 import { ndjsonStream } from "@/lib/harness/stream";
 

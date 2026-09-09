@@ -117,6 +117,23 @@ export function ThinkingBlock({ text }: { text: string }) {
   );
 }
 
+export function ThinkingDots({ label = "Thinking" }: { label?: string }) {
+  return (
+    <div className="flex items-center gap-2 text-sm text-muted" aria-live="polite">
+      <span className="inline-flex gap-1">
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className="size-1.5 animate-bounce rounded-full"
+            style={{ background: "var(--color-accent)", animationDelay: `${i * 0.15}s` }}
+          />
+        ))}
+      </span>
+      {label}
+    </div>
+  );
+}
+
 export function BlockView({ block }: { block: ChatBlock }) {
   if (block.type === "user") {
     return (
@@ -132,8 +149,8 @@ export function BlockView({ block }: { block: ChatBlock }) {
   }
   if (block.type === "assistant") {
     return (
-      <div className="max-w-[85%] text-sm leading-relaxed [&_a]:text-[var(--color-accent)] [&_code]:text-[var(--color-accent)]">
-        <Streamdown>{block.text}</Streamdown>
+      <div className="copilot-md max-w-[85%] text-sm leading-relaxed">
+        <Streamdown shikiTheme={["github-light", "github-dark"]}>{block.text}</Streamdown>
       </div>
     );
   }

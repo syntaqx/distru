@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getOrgContext } from "@/lib/session";
 import { parseTabular } from "@/lib/imports/parse";
-import { createImportFile, createImportJob, insertRows } from "@/lib/services/imports";
+import { createImportFile, createImportJob, insertRows } from "@/lib/modules/imports";
 import { getTarget } from "@/lib/imports/registry";
 
 export const maxDuration = 300;

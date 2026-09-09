@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getOrgContext } from "@/lib/session";
-import { getConversation } from "@/lib/services/conversations";
+import { getConversation } from "@/lib/harness/conversations";
 import { buildTranscript } from "@/lib/harness/transcript";
 
 export async function GET(

@@ -4,6 +4,8 @@ import { customersTarget } from "./targets/customers";
 import { vendorsTarget } from "./targets/vendors";
 import { priceListTarget } from "./targets/price-list";
 import { inventoryCountTarget } from "./targets/inventory-count";
+import { locationsTarget } from "./targets/locations";
+import { ordersTarget } from "./targets/orders";
 
 // Register import targets here. Adding one makes the entire import experience
 // (detection, mapping, validation, partial commit, error CSV) work for a new
@@ -14,6 +16,8 @@ const TARGETS: ImportTarget<unknown, unknown>[] = [
   vendorsTarget as ImportTarget<unknown, unknown>,
   priceListTarget as ImportTarget<unknown, unknown>,
   inventoryCountTarget as ImportTarget<unknown, unknown>,
+  locationsTarget as ImportTarget<unknown, unknown>,
+  ordersTarget as ImportTarget<unknown, unknown>,
 ];
 
 const byKey = new Map(TARGETS.map((t) => [t.key, t]));

@@ -1,0 +1,46 @@
+import { NextResponse } from "next/server";
+import { getOrgContext } from "@/lib/session";
+import {
+  createWorkflow,
+  listRuns,
+  listWorkflows,
+} from "@/lib/harness/workflows";
+
+export async function GET() {
+  const ctx = await getOrgContext();
+  if (!ctx) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const workflows = await listWorkflows(ctx);
+  // Attach the most recent run of each so the Automations page can show status.
+  const withRuns = await Promise.all(
+    workflows.map(async (w) => ({
+      ...w,
+      recentRuns: await listRuns(ctx, w.id, 3),
+    })),
+  );
+  return NextResponse.json({ workflows: withRuns });
+}
+
+export async function POST(req: Request) {
+  const ctx = await getOrgContext();
+  if (!ctx) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const body = (await req.json().catch(() => ({}))) as {
+    name?: string;
+    instruction?: string;
+    trigger?: "manual" | "schedule";
+    schedule?: string | null;
+  };
+  if (!body.name || !body.instruction) {
+    return NextResponse.json(
+      { error: "name and instruction are required" },
+      { status: 400 },
+    );
+  }
+  const workflow = await createWorkflow(ctx, {
+    name: body.name,
+    instruction: body.instruction,
+    trigger: body.trigger,
+    schedule: body.schedule,
+    createdBy: ctx.userId,
+  });
+  return NextResponse.json({ workflow });
+}

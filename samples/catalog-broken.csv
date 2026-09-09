@@ -1,0 +1,13 @@
+Name,SKU,Category,Vendor,Unit,Price
+Real Product One,BROK-1,Flower,Kush Co,Gram,22.00
+,BROK-2,Flower,Kush Co,Gram,20.00
+Missing SKU Item,,Edibles,Cloud9 Labs,Unit,18.00
+No Unit Item,BROK-4,Vapes,Cloud9 Labs,,35.00
+Bad Price Item,BROK-5,Flower,Kush Co,Gram,call for price
+Weird Unit Item,BROK-6,Flower,Kush Co,sploots,15.00
+Real Product Two,BROK-7,Concentrates,Kush Co,Gram,40.00
+,,,,,
+Only A Name,,,,,
+Half Filled,BROK-10,,,,
+Real Product Three,BROK-11,Edibles,Cloud9 Labs,Unit,12.00
+No Price No Unit,BROK-12,Flower,Kush Co,,

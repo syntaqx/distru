@@ -9,9 +9,7 @@ export function Logo({ className = "" }: { className?: string }) {
       >
         <Leaf size={16} />
       </span>
-      <span>
-        Distru<span style={{ color: "var(--color-accent)" }}> AI</span>
-      </span>
+      <span>Distru</span>
     </span>
   );
 }

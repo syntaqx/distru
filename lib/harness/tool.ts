@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import type { ServiceCtx } from "@/lib/services/context";
+import type { ServiceCtx } from "@/lib/modules/shared";
 import type { HarnessEvent, HarnessToolPreview } from "./types";
 
 /** Streaming + tenant context handed to every tool. */

@@ -1,4 +1,4 @@
-import type { ServiceCtx } from "@/lib/services/context";
+import type { ServiceCtx } from "@/lib/modules/shared";
 import {
   countByStatus,
   getJob,
@@ -6,7 +6,7 @@ import {
   updateJob,
   updateRow,
   type ImportRow,
-} from "@/lib/services/imports";
+} from "@/lib/modules/imports";
 import { getTarget } from "./registry";
 import type { ColumnMapping, RowError, ValidationSummary } from "./types";
 

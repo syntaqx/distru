@@ -1,5 +1,5 @@
-import type { ServiceCtx } from "@/lib/services/context";
-import { productSkuMap, updateProduct } from "@/lib/services/products";
+import type { ServiceCtx } from "@/lib/modules/shared";
+import { productSkuMap, updateProduct } from "@/lib/modules/catalog";
 import type { ImportTarget } from "../target";
 import type { CanonicalField, RowError } from "../types";
 

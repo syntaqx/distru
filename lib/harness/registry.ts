@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type Anthropic from "@anthropic-ai/sdk";
+import type { ModelToolSpec } from "./providers/types";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyTool = import("./tool").HarnessTool<any>;
 
@@ -21,25 +21,23 @@ export function allTools(): AnyTool[] {
   return [...registry.values()];
 }
 
-/** Convert registered tools into Anthropic tool definitions (JSON Schema). */
-export function toAnthropicTools(): Anthropic.Tool[] {
+/**
+ * Convert registered tools into provider-neutral specs (name, description, JSON
+ * Schema). Each model provider maps these into its own wire format, so the tool
+ * definitions live in one place regardless of which model is driving them.
+ */
+export function toolSpecs(): ModelToolSpec[] {
   return allTools().map((tool) => {
     const schema = z.toJSONSchema(tool.inputSchema, {
       target: "draft-2020-12",
     }) as Record<string, unknown>;
     delete schema["$schema"];
-    if (schema.type !== "object") {
-      // Anthropic tool inputs must be objects.
-      return {
-        name: tool.name,
-        description: tool.description,
-        input_schema: { type: "object", properties: {} },
-      } as Anthropic.Tool;
-    }
+    const inputSchema =
+      schema.type === "object" ? schema : { type: "object", properties: {} };
     return {
       name: tool.name,
       description: tool.description,
-      input_schema: schema as Anthropic.Tool.InputSchema,
+      inputSchema,
     };
   });
 }

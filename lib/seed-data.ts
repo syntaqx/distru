@@ -1,15 +1,20 @@
 import { db } from "@/db";
 import { unitTypes } from "@/db/schema";
-import { systemCtx } from "@/lib/services/context";
+import { systemCtx } from "@/lib/modules/shared";
 import {
   _resetUnitTypeCache,
   findOrCreateCompany,
   getDefaultLocation,
-} from "@/lib/services/reference";
-import { upsertProduct } from "@/lib/services/products";
-import { resolveUnitType } from "@/lib/services/reference";
-import { findOrCreateCategory } from "@/lib/services/reference";
-import { adjustInventory, getOnHand } from "@/lib/services/inventory";
+} from "@/lib/modules/catalog";
+import { upsertProduct } from "@/lib/modules/catalog";
+import { resolveUnitType } from "@/lib/modules/catalog";
+import { findOrCreateCategory } from "@/lib/modules/catalog";
+import { adjustInventory, getOnHand } from "@/lib/modules/inventory";
+import { createWorkflow, listWorkflows } from "@/lib/harness/workflows";
+import { getProductBySku } from "@/lib/modules/catalog";
+import { findOrCreateCustomer } from "@/lib/modules/catalog";
+import { createOrder, listOrders } from "@/lib/modules/sales";
+import { createInvoiceForOrder, recordPayment } from "@/lib/modules/sales";
 
 const UNIT_TYPES: { name: string; kind: "WEIGHT" | "VOLUME" | "COUNT" }[] = [
   { name: "Gram", kind: "WEIGHT" },
@@ -91,5 +96,59 @@ export async function provisionOrgSampleData(orgId: string) {
         reason: "opening balance",
       });
     }
+  }
+
+  // A sample automation so the Automations page is discoverable out of the box.
+  if ((await listWorkflows(ctx)).length === 0) {
+    await createWorkflow(ctx, {
+      name: "Low-stock report",
+      instruction:
+        "Find every active product with on-hand below 25 units and list them " +
+        "with their SKU and current on-hand, lowest first. This is a read-only " +
+        "report; do not change any data.",
+      trigger: "manual",
+    });
+  }
+
+  // A couple of sample sales orders + an invoice so the Sales page isn't empty.
+  if ((await listOrders(ctx)).items.length === 0) {
+    await seedSampleOrders(ctx);
+  }
+}
+
+/** Seed two confirmed orders (decrementing stock) and one paid-in-part invoice. */
+async function seedSampleOrders(ctx: ReturnType<typeof systemCtx>) {
+  const lineFor = async (sku: string, quantity: number) => {
+    const p = await getProductBySku(ctx, sku);
+    if (!p) return null;
+    return {
+      productId: p.product.id,
+      sku: p.product.sku,
+      name: p.product.name,
+      quantity,
+      unitPrice: Number(p.product.unitPrice ?? 0),
+    };
+  };
+
+  const greenLeaf = await findOrCreateCustomer(ctx, "Green Leaf Dispensary");
+  const l1 = [await lineFor("FL-BD-35", 10), await lineFor("FL-OG-35", 5)].filter((x) => x != null);
+  if (l1.length) {
+    const order = await createOrder(ctx, {
+      customerId: greenLeaf.id,
+      status: "COMPLETED",
+      items: l1 as NonNullable<(typeof l1)[number]>[],
+    });
+    const invoice = await createInvoiceForOrder(ctx, order.order.id);
+    await recordPayment(ctx, invoice.invoice.id, { amount: Math.round(order.total / 2), method: "ach" });
+  }
+
+  const highDesert = await findOrCreateCustomer(ctx, "High Desert Collective");
+  const l2 = [await lineFor("VP-LR-1", 12), await lineFor("ED-GUM-100", 20)].filter((x) => x != null);
+  if (l2.length) {
+    await createOrder(ctx, {
+      customerId: highDesert.id,
+      status: "PROCESSING",
+      items: l2 as NonNullable<(typeof l2)[number]>[],
+    });
   }
 }

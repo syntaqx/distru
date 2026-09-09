@@ -1,16 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Sparkles } from "lucide-react";
 import { Sidebar } from "@/components/sidebar";
-import { ChatView } from "@/components/chat/chat-view";
+import { TopBar } from "@/components/topbar";
+import { OrgSwitcher } from "@/components/org-switcher";
+import { CopilotPanel } from "@/components/chat/copilot-panel";
+import { ThemeProvider } from "@/components/theme";
 
 const STORAGE_KEY = "distru:copilot:open";
 
 /**
- * The app shell: sidebar + page content + a dockable Copilot on the right. The
- * dock lives beside whatever page you're on (it pushes content, doesn't take
- * over), and any "Ask the Copilot" button opens it via a window event.
+ * App shell. A full-width top bar whose left segment (aligned over the sidebar)
+ * holds the Cloudflare-style workspace switcher; below it the sidebar + page.
+ * The Copilot is a floating, draggable window (not a page-pushing dock).
  */
 export function AppChrome({
   orgName,
@@ -25,8 +27,6 @@ export function AppChrome({
 }) {
   const [open, setOpen] = useState(false);
 
-  // Restore the dock's open/closed state after hydration (reading localStorage
-  // in a useState initializer would cause an SSR/client hydration mismatch).
   useEffect(() => {
     try {
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -41,8 +41,6 @@ export function AppChrome({
   }, [open]);
 
   useEffect(() => {
-    const onOpen = () => setOpen(true);
-    const onToggle = () => setOpen((v) => !v);
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "j") {
         e.preventDefault();
@@ -50,47 +48,35 @@ export function AppChrome({
       }
       if (e.key === "Escape") setOpen(false);
     };
+    const onOpen = () => setOpen(true);
+    const onToggle = () => setOpen((v) => !v);
+    window.addEventListener("keydown", onKey);
     window.addEventListener("distru:copilot:open", onOpen);
     window.addEventListener("distru:copilot:toggle", onToggle);
-    window.addEventListener("keydown", onKey);
     return () => {
+      window.removeEventListener("keydown", onKey);
       window.removeEventListener("distru:copilot:open", onOpen);
       window.removeEventListener("distru:copilot:toggle", onToggle);
-      window.removeEventListener("keydown", onKey);
     };
   }, []);
 
   return (
-    <div className="flex h-dvh overflow-hidden">
-      <Sidebar
-        orgName={orgName}
-        userName={userName}
-        userEmail={userEmail}
-        onToggleCopilot={() => setOpen((v) => !v)}
-        copilotOpen={open}
-      />
-      <main className="min-w-0 flex-1 overflow-hidden">{children}</main>
-
-      <aside
-        className="shrink-0 overflow-hidden border-l transition-[width] duration-200 ease-out"
-        style={{ width: open ? "min(440px, 92vw)" : 0, background: "var(--color-surface)" }}
-        aria-hidden={!open}
-      >
-        <div className="h-full" style={{ width: "min(440px, 92vw)" }}>
-          <ChatView compact onClose={() => setOpen(false)} />
+    <ThemeProvider>
+      <div className="flex h-dvh flex-col overflow-hidden">
+        <div className="flex h-14 shrink-0 border-b" style={{ background: "var(--color-surface)" }}>
+          <div className="flex w-64 shrink-0 items-center border-r px-2">
+            <OrgSwitcher initialName={orgName} />
+          </div>
+          <TopBar onToggleCopilot={() => setOpen((v) => !v)} copilotOpen={open} />
         </div>
-      </aside>
 
-      {!open && (
-        <button
-          onClick={() => setOpen(true)}
-          className="btn btn-primary fixed bottom-5 right-5 z-20 rounded-full px-4 py-3 shadow-lg"
-          title="Open Copilot (⌘/Ctrl+J)"
-        >
-          <Sparkles size={18} />
-          <span className="text-sm font-medium">Ask Copilot</span>
-        </button>
-      )}
-    </div>
+        <div className="flex min-w-0 flex-1 overflow-hidden">
+          <Sidebar userName={userName} userEmail={userEmail} />
+          <main className="min-w-0 flex-1 overflow-hidden">{children}</main>
+        </div>
+      </div>
+
+      <CopilotPanel open={open} onClose={() => setOpen(false)} />
+    </ThemeProvider>
   );
 }

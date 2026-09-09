@@ -1,5 +1,4 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import { anthropic, MODEL } from "@/lib/anthropic";
 import {
   appendMessage,
   getToolCall,
@@ -7,10 +6,11 @@ import {
   recordToolCall,
   toMessageParams,
   updateToolCall,
-} from "@/lib/services/conversations";
-import { getConversation } from "@/lib/services/conversations";
+} from "@/lib/harness/conversations";
+import { getConversation } from "@/lib/harness/conversations";
 import type { AgentContext } from "./tool";
-import { getTool, toAnthropicTools } from "./registry";
+import { getTool, toolSpecs } from "./registry";
+import { getModelProvider } from "./providers";
 import { ensureToolsRegistered } from "./tools";
 import { buildSystemPrompt } from "./system-prompt";
 import type { Interrupt, ToolDecision } from "./types";
@@ -30,46 +30,6 @@ function toolResultBlock(
   };
 }
 
-/** Stream one assistant turn; returns the completed message. */
-async function streamAssistant(
-  ctx: AgentContext,
-  messages: Anthropic.MessageParam[],
-  system: string,
-): Promise<Anthropic.Message> {
-  const stream = anthropic.messages.stream({
-    model: MODEL,
-    max_tokens: 16000,
-    system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
-    thinking: { type: "adaptive", display: "summarized" },
-    tools: toAnthropicTools(),
-    messages,
-  });
-
-  for await (const event of stream) {
-    if (event.type === "content_block_start") {
-      if (event.content_block.type === "tool_use") {
-        ctx.emit({
-          type: "tool_start",
-          toolUseId: event.content_block.id,
-          name: event.content_block.name,
-        });
-      }
-    } else if (event.type === "content_block_delta") {
-      const delta = event.delta;
-      if (delta.type === "text_delta") ctx.emit({ type: "token", text: delta.text });
-      else if (delta.type === "thinking_delta")
-        ctx.emit({ type: "thinking", text: delta.thinking });
-      else if (delta.type === "input_json_delta")
-        ctx.emit({
-          type: "tool_input",
-          toolUseId: "",
-          partialJson: delta.partial_json,
-        });
-    }
-  }
-  return stream.finalMessage();
-}
-
 async function systemPrompt(ctx: AgentContext) {
   const conv = await getConversation(ctx.service, ctx.conversationId);
   return buildSystemPrompt({
@@ -82,13 +42,22 @@ async function systemPrompt(ctx: AgentContext) {
  * Run the agent loop until it finishes its turn (end_turn) or pauses for a human
  * decision (interrupt). `messages` must end with a user message.
  */
-async function runLoop(ctx: AgentContext, messages: Anthropic.MessageParam[]) {
+async function runLoop(
+  ctx: AgentContext,
+  messages: Anthropic.MessageParam[],
+  autoApprove = false,
+) {
   const system = await systemPrompt(ctx);
 
+  const provider = getModelProvider();
+
   for (let step = 0; step < MAX_STEPS; step++) {
-    let final: Anthropic.Message;
+    let turn: Awaited<ReturnType<typeof provider.streamTurn>>;
     try {
-      final = await streamAssistant(ctx, messages, system);
+      turn = await provider.streamTurn(
+        { system, messages, tools: toolSpecs() },
+        (event) => ctx.emit(event),
+      );
     } catch (err) {
       console.error("[runner] stream error", err);
       ctx.emit({
@@ -99,17 +68,15 @@ async function runLoop(ctx: AgentContext, messages: Anthropic.MessageParam[]) {
     }
 
     // Persist + track the assistant turn.
-    await appendMessage(ctx.service, ctx.conversationId, "assistant", final.content);
-    messages.push({ role: "assistant", content: final.content });
+    await appendMessage(ctx.service, ctx.conversationId, "assistant", turn.content);
+    messages.push({ role: "assistant", content: turn.content });
 
-    if (final.stop_reason !== "tool_use") {
-      ctx.emit({ type: "done", stopReason: final.stop_reason });
+    if (turn.stopReason !== "tool_use") {
+      ctx.emit({ type: "done", stopReason: turn.stopReason });
       return;
     }
 
-    const toolUses = final.content.filter(
-      (b): b is Anthropic.ToolUseBlock => b.type === "tool_use",
-    );
+    const toolUses = turn.toolUses;
     const results: Anthropic.ToolResultBlockParam[] = [];
     const interrupts: Interrupt[] = [];
 
@@ -147,6 +114,42 @@ async function runLoop(ctx: AgentContext, messages: Anthropic.MessageParam[]) {
           inputJson: tu.input as Record<string, unknown>,
           status: res.ok ? "auto" : "error",
           requiresConfirmation: false,
+          output: res,
+        });
+        ctx.emit({
+          type: "tool_result",
+          toolUseId: tu.id,
+          name: tu.name,
+          ok: res.ok,
+          summary: res.summary,
+        });
+        results.push(toolResultBlock(tu.id, res));
+      } else if (autoApprove) {
+        // Automated run (workflow/system trigger): no human is present, so
+        // execute the gated tool immediately instead of pausing. The `ask_user`
+        // tool gets a synthetic "proceed" answer.
+        let res: ToolResult;
+        try {
+          res =
+            tool.gate === "question"
+              ? await tool.execute(tu.input, ctx, {
+                  answer:
+                    "This is an automated workflow run; no user is available. Proceed with your best judgment using safe defaults.",
+                })
+              : await tool.execute(tu.input, ctx);
+        } catch (err) {
+          res = {
+            ok: false,
+            summary: err instanceof Error ? err.message : "Tool failed.",
+          };
+        }
+        await recordToolCall(ctx.service, {
+          conversationId: ctx.conversationId,
+          toolUseId: tu.id,
+          name: tu.name,
+          inputJson: tu.input as Record<string, unknown>,
+          status: res.ok ? "auto" : "error",
+          requiresConfirmation: true,
           output: res,
         });
         ctx.emit({
@@ -195,10 +198,13 @@ async function runLoop(ctx: AgentContext, messages: Anthropic.MessageParam[]) {
 }
 
 /** Entry point for a fresh user message (already persisted by the caller). */
-export async function runConversationTurn(ctx: AgentContext) {
+export async function runConversationTurn(
+  ctx: AgentContext,
+  opts?: { autoApprove?: boolean },
+) {
   ensureToolsRegistered();
   const rows = await loadMessages(ctx.service, ctx.conversationId);
-  await runLoop(ctx, toMessageParams(rows));
+  await runLoop(ctx, toMessageParams(rows), opts?.autoApprove ?? false);
 }
 
 /**

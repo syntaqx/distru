@@ -1,8 +1,8 @@
-import type { ServiceCtx } from "@/lib/services/context";
+import type { ServiceCtx } from "@/lib/modules/shared";
 import { db } from "@/db";
 import { toolCalls } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
-import { loadMessages } from "@/lib/services/conversations";
+import { loadMessages } from "@/lib/harness/conversations";
 import type { HarnessToolPreview, Interrupt } from "./types";
 
 export type DisplayItem =

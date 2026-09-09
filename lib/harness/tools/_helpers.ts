@@ -1,10 +1,10 @@
-import type { ServiceCtx } from "@/lib/services/context";
+import type { ServiceCtx } from "@/lib/modules/shared";
 import {
   getProduct,
   getProductBySku,
   listProducts,
   type ProductWithRefs,
-} from "@/lib/services/products";
+} from "@/lib/modules/catalog";
 
 /** Resolve a product from an id, SKU, or fuzzy name. */
 export async function resolveProduct(

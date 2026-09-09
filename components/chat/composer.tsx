@@ -1,14 +1,18 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { FileText, Loader, Paperclip, Send, X } from "lucide-react";
+import { FileText, Loader, Paperclip, Send, Square, X } from "lucide-react";
 
 export function Composer({
   disabled,
+  streaming,
+  onStop,
   onSend,
   onUpload,
 }: {
   disabled: boolean;
+  streaming: boolean;
+  onStop: () => void;
   onSend: (text: string, importJobId?: string) => void;
   onUpload: (file: File) => Promise<{ jobId: string; rowCount: number } | null>;
 }) {
@@ -18,7 +22,7 @@ export function Composer({
   const fileRef = useRef<HTMLInputElement>(null);
 
   function send() {
-    if (disabled) return;
+    if (disabled || streaming) return;
     if (!text.trim() && !attached) return;
     const msg = text.trim() || (attached ? `I uploaded ${attached.filename}. What can you do with it?` : "");
     onSend(msg, attached?.jobId);
@@ -54,7 +58,7 @@ export function Composer({
           <button
             className="btn btn-ghost px-2"
             title="Upload CSV / XLSX"
-            disabled={disabled || uploading}
+            disabled={disabled || uploading || streaming}
             onClick={() => fileRef.current?.click()}
           >
             {uploading ? <Loader size={18} className="animate-spin" /> : <Paperclip size={18} />}
@@ -84,14 +88,20 @@ export function Composer({
               }
             }}
           />
-          <button
-            className="btn btn-primary"
-            disabled={disabled || (!text.trim() && !attached)}
-            onClick={send}
-            aria-label="Send"
-          >
-            <Send size={16} />
-          </button>
+          {streaming ? (
+            <button className="btn btn-outline" onClick={onStop} aria-label="Stop" title="Stop">
+              <Square size={15} />
+            </button>
+          ) : (
+            <button
+              className="btn btn-primary"
+              disabled={disabled || (!text.trim() && !attached)}
+              onClick={send}
+              aria-label="Send"
+            >
+              <Send size={16} />
+            </button>
+          )}
         </div>
         <p className="mt-1.5 text-center text-[11px] text-[var(--color-muted)]">
           Mutations require your approval. Distru Copilot can make mistakes - review changes.

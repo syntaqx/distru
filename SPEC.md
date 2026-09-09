@@ -18,7 +18,7 @@ The exercise's first use case is: **"a customer uploads a CSV of their product c
 
 Rather than build a one-off CSV importer, this implementation builds the **harness** the importer rides on, so the same substrate powers chat today and workflows tomorrow. To make the design decisions real (and testable), the repo also implements the slice of Distru the harness acts on - **we are Distru** here: a multitenant catalog/inventory core, a Distru-API-faithful public API, an MCP server, and signed webhooks.
 
-**Design thesis: one service layer, many faces.** A single org-scoped domain/service layer is the source of truth. Everything else is a thin adapter over it. Adding a capability = one service function + thin wrappers on each face. This is what makes the harness durable as scope grows.
+**Design thesis: a modular platform, with a Copilot on top.** This is deliberately **two pieces**. Piece 1 is the platform: an org-scoped domain of **bounded-context modules** (`lib/modules/*`) that is the single source of truth and has *no dependency on the AI*. Piece 2 is the agentic harness (`lib/harness/*`), layered over it. Every face - chat, REST, MCP, bulk - is a thin adapter over the same modules, so adding a capability = one module function + thin wrappers. The module boundaries (public barrels; a downward-only, acyclic dependency graph; domain-never-imports-Copilot) are **enforced by ESLint**, so the architecture is a modular monolith that stays extractable into services as scope grows.
 
 ---
 
@@ -33,31 +33,54 @@ flowchart TD
       Bulk[/upload-products bulk engine/]
       WF[Workflows - cron/webhook  *future*]
     end
-    subgraph Harness
+    subgraph Harness["Piece 2 · Copilot (lib/harness)"]
       Runner[Agent runner: stream loop + HITL gate + resume]
       Registry[Tool registry]
       Ctx[AgentContext / ServiceCtx  - org-scoped]
     end
-    subgraph Services
-      P[products] --- I[inventory] --- R[reference] --- IM[imports] --- T[tokens] --- W[webhooks] --- A[audit]
+    subgraph Modules["Piece 1 · Platform domain (lib/modules)"]
+      S[sales] --> I[inventory]
+      S --> C[catalog]
+      C --> K[[shared kernel]]
+      I --> K
+      PL[platform] --> K
+      IM[imports] --> K
     end
     DB[(Postgres · Drizzle · UUIDv7 · multitenant)]
 
-    Chat --> Runner --> Registry --> Ctx --> Services --> DB
-    REST --> Services
-    MCP --> Services
+    Chat --> Runner --> Registry --> Ctx --> Modules --> DB
+    REST --> Modules
+    MCP --> Modules
     Bulk --> IM
     WF -.-> Runner
-    Services --> W
+    Modules --> DB
 ```
 
-**Stack:** Next.js 16 (App Router) + React 19, TypeScript, Tailwind v4, deployable to Vercel. Postgres via Drizzle (`postgres.js` driver - portable local↔Neon). Auth + multitenancy via **better-auth** + organization plugin. Agent via the **Anthropic SDK** (`claude-opus-5`, adaptive thinking, streaming). Chat UI uses **lucide-react** + **streamdown** (streaming markdown). Everything is **UUIDv7** end to end (auth rows and domain rows share one keyspace).
+**Stack:** Next.js 16 (App Router) + React 19, TypeScript, Tailwind v4, deployable to Vercel. Postgres via Drizzle (`postgres.js` driver - portable local↔Neon). Auth + multitenancy via **better-auth** + organization plugin. Agent via a **provider-agnostic model seam** (§3.7): `MODEL_PROVIDER` selects Anthropic (`claude-opus-5`, adaptive thinking, streaming) or OpenAI (`gpt-4.1`), and adding a vendor is one adapter + one env var. Chat UI uses **lucide-react** + **streamdown** (streaming markdown). Everything is **UUIDv7** end to end (auth rows and domain rows share one keyspace).
 
 Why these choices:
 
 - **One language, one deploy target.** Next on Vercel means the agent loop, the REST API, the MCP server, and the UI live in one codebase with one auth story.
-- **Service layer over the DB, not over HTTP.** The chat tools call service functions directly (no internal HTTP hop), so the agent is fast and transactional; the REST/MCP faces call the *same* functions. There is exactly one place that knows how to create a product.
+- **Modules over the DB, not over HTTP.** The chat tools call module functions directly (no internal HTTP hop), so the agent is fast and transactional; the REST/MCP faces call the *same* functions. There is exactly one place that knows how to create a product.
 - **Manual streaming agent loop** (not the SDK tool-runner) because human-in-the-loop needs to *pause a turn mid-stream, persist, and resume across a stateless serverless invocation* - control the tool-runner doesn't expose.
+- **Provider-agnostic by design** (§3.7). The runner, tools, HITL, and conversation store never name a vendor; a `ModelProvider` adapter is the only model-specific code, so Anthropic↔OpenAI is an env flip, not a rewrite.
+
+### 2.1 Data model (Drizzle + Postgres; every domain row org-scoped, UUIDv7)
+
+Full schema in `db/schema/` (~70 tables, one file per bounded context). Grouped:
+
+- **Auth / tenancy** (better-auth): `user`, `session`, `account`, `verification`, `organization`, `member`, `invitation`.
+- **Catalog:** `products` (SKU unique per org, plus UPC, MSRP, THC/CBD, brand/strain/subcategory/product-group FKs, flags), `product_images`, `categories`, `product_subcategories`, `product_groups`, `official_product_categories`, `strains`, `companies` (VENDOR / BRAND / CUSTOMER), `company_groups`, `contacts`, `locations`, `unit_types` (global reference set), `taxes`, `tags`, `price_tiers`, `charge_presets`, `custom_fields`, `menus`.
+- **Inventory:** `inventory_ledger` - append-only movements, on-hand = `SUM(quantity_delta)`; `batches`, `packages`, `bins`.
+- **Sales:** `orders` + `order_items` (SKU/name snapshotted per line) + `order_charges` (fee/discount/shipping/tax breakdown), `invoices` (financial snapshot + void flag), `payments`, `payment_methods`, `payment_terms`, `credits`, `returns` + `return_items` - confirming an order posts negative `inventory_ledger` movements.
+- **Purchasing:** `purchase_orders` + `purchase_order_items`.
+- **Manufacturing:** `assemblies` + `assembly_inputs` / `assembly_outputs`, `costs`, `cost_types`.
+- **Compliance:** `licenses`, `license_types`, `test_results` (Metrc/BioTrack-shaped COAs).
+- **Logistics:** `drivers`, `vehicles`.
+- **Imports:** `import_files`, `import_jobs`, `import_rows` (the 10k rows live here, never in the model).
+- **Chat / harness:** `conversations`, `messages` (raw content blocks - the canonical IR), `tool_calls` (input / output / status / decision).
+- **Automations:** `workflows`, `workflow_runs` (headless runs with per-run transcript + status).
+- **Platform:** `api_tokens` (SHA-256 hashed), `webhook_endpoints`, `webhook_deliveries`, `tasks`, `file_attachments`, `audit_log` (every mutation, from every face).
 
 ---
 
@@ -86,7 +109,7 @@ Tools are registered in a registry (`lib/harness/registry.ts`); `toAnthropicTool
 
 ### 3.3 The runner (`lib/harness/runner.ts`)
 
-A manual streaming loop over `client.messages.stream`:
+A manual streaming loop over the active provider's `streamTurn` (§3.7), not a vendor SDK call directly:
 
 1. Load conversation history from Postgres → `MessageParam[]`.
 2. Stream an assistant turn; emit NDJSON events (`token`, `thinking`, `tool_start`, `tool_input`, `tool_result`, `interrupt`, `error`, `done`) to the client.
@@ -105,6 +128,29 @@ Mutating tools (`gate: "confirmation"`) and `ask_user` (`gate: "question"`) neve
 
 `ask_user` is a distinct gate (not a mutation) so the model can get a structured decision mid-task - "Category 'Edibles' doesn't exist, create it?" - with typed options, without a plain-text guess.
 
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant UI as Chat dock
+    participant R as Runner (/messages)
+    participant DB as Postgres
+    participant M as Claude
+    U->>UI: message
+    UI->>R: POST /messages (NDJSON stream)
+    R->>M: stream turn (tools)
+    M-->>R: tool_use (mutating)
+    R->>DB: persist assistant turn + pending tool_call (with preview)
+    R-->>UI: interrupt -> Approve / Reject card
+    Note over R,UI: turn paused; no server-side state held
+    U->>UI: Approve
+    UI->>R: POST /resume {decision}
+    R->>DB: rebuild history + load pending calls
+    R->>DB: execute approved tool (write) + audit
+    R->>M: continue with tool_result(s)
+    M-->>R: final answer
+    R-->>UI: tokens + done (page refreshes)
+```
+
 Verified in this repo: mutation → interrupt with preview → **approve** writes the row (checked in Postgres); **reject** returns "user declined" and the model adapts.
 
 ### 3.5 Trigger-agnostic by construction
@@ -113,7 +159,13 @@ Verified in this repo: mutation → interrupt with preview → **approve** write
 
 ### 3.6 Tools beyond our own (external MCP servers)
 
-The brief's copilot uses the Distru MCP *plus the customer's own connected MCP servers* (QuickBooks, Sage, Metrc, Google Drive/Sheets, Calendar). The registry is built for exactly that: a tool is just `{ name, description, inputSchema, gate, execute }`, so tools sourced from an external MCP server register alongside the built-ins and inherit the **same gate/preview/audit** wrapper - a QuickBooks `create_invoice` would show the same Approve card as our `create_product`, and land in the same audit log. What's implemented here is the internal registry and our own MCP *server* (so others can drive Distru); the deferred piece is the MCP *client* that discovers a customer's connected servers and registers their tools. This is also what powers cross-tool **workflows** - e.g. the brief's "lab COA email → attach the PDF in Drive → mark the Distru inventory ready for sale" is just that same loop with an email trigger and tools from three MCP servers.
+The brief's copilot uses the Distru MCP *plus the customer's own connected MCP servers* (QuickBooks, Sage, Metrc, Google Drive/Sheets, Calendar). The registry is built for exactly that: a tool is just `{ name, description, inputSchema, gate, execute }`,c so tools sourced from an external MCP server register alongside the built-ins and inherit the **same gate/preview/audit** wrapper - a QuickBooks `create_invoice` would show the same Approve card as our `create_product`, and land in the same audit log. What's implemented here is the internal registry and our own MCP *server* (so others can drive Distru); the deferred piece is the MCP *client* that discovers a customer's connected servers and registers their tools. This is also what powers cross-tool **workflows** - e.g. the brief's "lab COA email → attach the PDF in Drive → mark the Distru inventory ready for sale" is just that same loop with an email trigger and tools from three MCP servers.
+
+### 3.7 Provider-agnostic model seam (`lib/harness/providers/`)
+
+The runner never imports a vendor SDK. A `ModelProvider` interface - `{ id, model, isConfigured(), streamTurn(req, emit) }` - is the *only* model-specific code, and `MODEL_PROVIDER` (default `anthropic`; also `openai`) selects the active one. Two adapters ship: Anthropic (`claude-opus-5`, native streaming + thinking) and OpenAI (`gpt-4.1`, over the Chat Completions API, `OPENAI_BASE_URL` overridable for Azure/Open-compatible gateways). Adding a vendor is one file + one registry entry.
+
+The trick that keeps this clean: the harness standardizes on **Anthropic's content-block message shape as its canonical IR** (`text` / `tool_use` / `tool_result` / `thinking`) - it's a superset, and it's what we already persist. A provider that speaks a different wire format translates at *its* edge (OpenAI `tool_calls` ↔ our `tool_use` blocks) and the rest of the system - loop, HITL gate, tool registry, conversation store, audit - never sees the difference. So "swap Anthropic for OpenAI" is genuinely an env flip, and the integrations a customer wires up (tools, gates, workflows) work identically on either.
 
 ---
 
@@ -133,7 +185,7 @@ type ImportTarget<Prep, Value> = {
 };
 ```
 
-Five targets are registered today and all ride the same pipeline: **products** (upsert catalog), **customers** and **vendors/distributors** (CRM companies), **price-list** (update prices by SKU), and **inventory-count** (set on-hand by SKU). Adding one is a single file - mapping, detection, validation, partial commit, and the error CSV all work for it with **zero pipeline changes**. That is the answer to "how does this scale to other CSVs?" - and it's why the agent can say *"I think this is a distributor list / price sheet / inventory count - what do you want to do with it?"* about a file it's never seen.
+Seven targets are registered today and all ride the same pipeline: **products** (upsert catalog), **customers** and **vendors/distributors** (CRM companies), **price-list** (update prices by SKU), **inventory-count** (set on-hand by SKU), **locations** (warehouses), and **orders** (line items grouped into draft sales orders). Adding one is a single file - mapping, detection, validation, partial commit, and the error CSV all work for it with **zero pipeline changes**. That is the answer to "how does this scale to other CSVs?" - and it's why the agent can say *"I think this is a distributor list / price sheet / inventory count / sales-order export - what do you want to do with it?"* about a file it's never seen.
 
 ### 4.2 The pipeline (`lib/imports/pipeline.ts`)
 
@@ -158,11 +210,16 @@ Rows are persisted and processed in chunks with progress; validate/commit are O(
 
 Modeled directly on Distru's real surface (`apidocs.distru.dev`, `mcp.distru.com`, the bulk-upload help center):
 
-- **Product schema:** inventory tracking method (`PACKAGE|PRODUCT|BATCH`), name, unique SKU, category, vendor/brand (a CRM company), unit type (fixed singular set), unit price, net qty / serving fields, custom fields.
-- **Public API conventions:** `Authorization: Bearer` tokens (SHA-256 hashed at rest); UUID ids; **numbers serialized as strings** (`"25.000000"`); microsecond ISO-8601 datetimes; uppercase enums; nulls always present; `page[number]` pagination with `next_page`; `{ errors: [{ message, pointer }] }`; **sparse upsert** (omit id→create, include→update, omit field→leave); **HMAC-signed webhooks** (`x-distru-signature: sha256=…`) with `CREATE/UPDATE/DELETE`.
-- **MCP server** (`/api/mcp`, Streamable-HTTP JSON-RPC) exposing `distru-search-products`, `distru-get-product`, `distru-create-product`, `distru-adjust-inventory`, `distru-list-categories` - so an *external* agent can drive Distru, the mirror image of our own copilot.
+- **Product schema:** inventory tracking method (`PACKAGE|PRODUCT|BATCH`), name, unique SKU, UPC, category + subcategory, vendor and brand (CRM companies), strain, product group, unit type (fixed singular set), unit price, MSRP, net qty / serving fields, THC/CBD potency, `is_inventory_item` / `is_sample` / `taxable` flags, an ordered **images** array (`{ id, url, position, is_primary }`), and custom fields.
+- **Resource surface:** the public REST API + MCP span the full Distru breadth - **130 documented routes** (Distru itself documents 128): catalog (products/images/product-categories/subcategories/groups/strains/companies/contacts/locations/unit-types/taxes/tags/menus/price-tiers), sales (orders/invoices/payments/credits/returns/charge-presets/adjustments), purchasing (purchases), manufacturing (assemblies/costs), compliance (licenses/test-results), logistics (drivers/vehicles), platform (custom-fields/file-attachments/tasks/users), a **Reports** API (18 endpoints), **Metrc** endpoints, **PDF** document routes, an **inventory** snapshot, and nested actions (record payment, attach image, void, add-costs…). Real behavior where the domain supports it; honest empty/placeholder responses for the external-integration surface (Metrc sync, PDFs for cultivation, third-party IDs) rather than fabricated data - the full audit is in **`DISTRU-PARITY.md`**. Depth beyond the app's own UI is deliberate - every face reaches these resources even where the in-app screen is still a Preview tile (§7).
+- **Public API conventions:** `Authorization: Bearer` tokens (SHA-256 hashed at rest); UUID ids; **numbers serialized as strings** (`"25.000000"`, 6 dp); microsecond ISO-8601 `…Z` datetimes; uppercase enums; nulls always present; **`page[number]` pagination echoing a followable `next_page` URL** (as Distru documents; we additionally accept an opaque `page[after]` cursor); comma-delimited inclusive datetime range filters; `{ errors: [{ message, pointer, section }] }`; **sparse upsert** (omit id→create, include→update, omit field→leave); **HMAC-signed webhooks** (`x-distru-signature: sha256=…`) with `CREATE/UPDATE/DELETE`.
+- **Self-documenting OpenAPI:** the OpenAPI 3.1 spec is **generated from the code** (route handlers + Zod schemas via `z.toJSONSchema`), served in-app under `/docs`, and a **prebuild drift guard** (`scripts/check-openapi.ts`, wired as `prebuild`) fails the build if any `/public/v1/**` route is missing from the spec, or lacks a documented method or 2xx schema - unless the route is on an explicit `OPENAPI_IGNORE` opt-out list (e.g. `/health`). Documentation can't silently rot: it's part of the same green build.
+- **MCP server** (`/api/mcp`, Streamable-HTTP JSON-RPC). Its `tools/list` is **derived from the harness registry** (`create_order` → `distru-create-order`), so the external tool surface tracks the copilot's own - product/inventory/catalog/order reads and writes, plus analytics - and an *external* agent can drive Distru, the mirror image of our own copilot.
 
-All of these are implemented and were exercised with `curl` during development (see `README.md` → Verify).
+All of these are implemented and were exercised with `curl` during development (see `README.md` → Verify), and `npm run check:openapi` currently reports **all 130 routes documented**.
+
+- **External integrations as a provider seam** (`lib/integrations/`, mirroring the model seam §3.7). The systems Distru syncs with — **Metrc** (track-and-trace), **QuickBooks** (accounting), **LeafLink** (marketplace), **BioTrack** — sit behind interfaces (`MetrcProvider`, `AccountingProvider`, …) chosen by env (`METRC_PROVIDER`, etc.; default `mock`, `none` = unconnected). The shipped **mock** adapters return **API-accurate** data (shaped to Distru's own Metrc schemas) that is **coherent** — a Metrc package is seeded from a real product's on-hand, a transfer from a real order, a company's `qb_vendor_id` is deterministic in its id — never random. The `/metrc/*` endpoints and the `leaflink_*`/`qb_*`/`metrc_*`/`biotrack_id` fields are populated by these providers; swapping in a live adapter is one file, no route or serializer change.
+- **Field-level parity, audited against the authoritative spec.** We diffed every core resource against Distru's real OpenAPI (`apidocs.distru.dev/openapi.json` — 128 paths, 297 schemas) and aligned the wire shapes exactly: `inserted_datetime` (not `created_datetime`), a company's `relationship_type`, an order's `company` + `items[].product`/`price`, product `total_thc`/`total_cbd`/`is_active`/`unit_net_weight`, invoice `paid_amount`/`remaining_amount`/`voided_datetime` with embedded `items`/`charges`, contact `first_name`/`last_name`. The full before/after and the deliberately-deferred deltas (Reports/Metrc/PDF subsystems, integration IDs) are in **`DISTRU-PARITY.md`**.
 
 In production the harness's product tools would call Distru's real MCP/API; here they call the service layer directly because this repo *is* Distru. The tool contract is identical either way, so swapping the backing call is a per-tool change, not a harness change.
 
@@ -192,18 +249,20 @@ In production the harness's product tools would call Distru's real MCP/API; here
 **MVP (built and runnable in this repo):**
 
 - Multitenant auth + org onboarding; auto-seeded demo tenant.
-- Product/category/company/location/inventory domain + service layer + audit log.
-- Agentic harness: streaming loop, tool registry, HITL confirmation + `ask_user`, resumable across invocations, full persistence.
-- CSV/XLSX import end-to-end: **target auto-detection (confident / ambiguous / none) → "what do you want to do with this?" (`ask_user`) → retarget** → LLM mapping → chunked validation → partial commit → row-mapped error CSV. **Five live targets** (`products`, `customers`, `vendors`, `price-list`, `inventory-count`) prove the generic framework - the same upload, detected and routed to the right one.
-- Distru-faithful public REST API (products/companies/categories/stock-adjustments), MCP server, `/upload-products`, HMAC webhooks.
-- App shell modeled on Distru's real modules: **Dashboard** (KPIs, module grid, live activity feed from the audit log), **Copilot** (streaming chat, tool cards, confirm/question cards, CSV upload), **Inventory**, **Companies** (CRM), and **Integrations** (mint tokens, API/MCP/webhook snippets). Sales Orders / Purchasing / Manufacturing / Compliance / Analytics are shown as honest "Preview" modules - the harness + service layer + public API/MCP are built to power them next.
+- Product/category/company/location/inventory domain + service layer + audit log, with catalog depth (images, strains, subcategories, product groups, brands) exposed on every face.
+- Agentic harness: streaming loop, **provider-agnostic model seam** (Anthropic/OpenAI, §3.7), tool registry, HITL confirmation + `ask_user`, resumable across invocations, full persistence. ~40 tools registered - catalog/inventory/sales reads + writes, **analytics** (`top_products`, `top_customers`, `sales_summary`, `open_invoices`, `inventory_report`), **bulk** ops (`bulk_update_products`, `bulk_set_on_hand`), **import** orchestration, **docs** search, and **workflow** management (`create_workflow` / `list_workflows` / `run_workflow`).
+- **Automations:** saved workflows that run the same harness **headlessly** and auto-approve their own actions (attributed to the workflow in the audit log), with run history + a per-run transcript - the "trigger-agnostic by construction" claim, demonstrated. A dedicated **Automations** UI manages and runs them.
+- CSV/XLSX import end-to-end: **target auto-detection (confident / ambiguous / none) → "what do you want to do with this?" (`ask_user`) → retarget** → LLM mapping → chunked validation → partial commit → row-mapped error CSV. **Seven live targets** (`products`, `customers`, `vendors`, `price-list`, `inventory-count`, `locations`, `orders`) prove the generic framework - the same upload, detected and routed to the right one. The `products` target also **downloads and attaches image URLs** and sets on-hand from a quantity column, and its canonical fields cover the full product schema (UPC, MSRP, THC/CBD, brand, subcategory…) with alias + LLM mapping for arbitrary customer column names.
+- **Sales orders + invoicing** (the revenue side of the catalog): create an order for a customer with line items, which decrements the inventory ledger once it leaves PENDING into PROCESSING (`sale:<order#>`, restored on cancel) and moves through Distru's real lifecycle (PENDING → PROCESSING → READY_TO_SHIP → DELIVERING → DELIVERED → COMPLETED, or CANCELED); generate an invoice snapshotting the order's financial breakdown; record payments that roll its payment status NOT_PAID → PARTIALLY_PAID → FULLY_PAID (→ OVER_PAID), with void as a separate flag. Exposed on every face - copilot tools (`create_order`, `create_invoice`, `record_payment`, `cancel_order`, all HITL-gated; plus read tools), a **Sales** UI page, the public REST API (`/public/v1/orders`, `/public/v1/invoices`), the MCP server, and a `orders` import target - all through the same service layer, so a sale from chat, API, or the page is the same transaction and the same audit entry.
+- Distru-faithful public REST API spanning ~40 resource groups / 130 self-documented routes (§5), MCP server, `/upload-products`, HMAC webhooks.
+- App shell modeled on Distru's real modules, with **editing on real routed pages** (detail + create/edit), not modals: **Dashboard** (KPIs, module grid, live activity feed from the audit log), **Copilot** (streaming chat, tool cards, confirm/question cards, CSV upload), **Inventory** (product detail + image-managing edit pages), **Categories**, **Companies** (CRM), **Sales** (order + invoice detail pages, inline payments), **Automations**, **Docs** (the in-app spec), **Settings**, and **Integrations** (mint tokens, API/MCP/webhook snippets). Reusable UI primitives include an accessible **Radix Select** replacing native dropdowns. Purchasing / Manufacturing / Compliance / Analytics remain honest **Preview tiles in the UI** - but their **domain modules, public REST API, MCP tools, and OpenAPI docs are already built** (§5); only the operator screens are deferred.
 
 **Deferred (specced; seams already in place):**
 
-- Queue-backed processing for >10k rows and cron/webhook-triggered **workflows** (same chunk functions, different trigger).
+- **Automation triggers.** Workflow *definitions* and headless *runs* are built (§7 MVP); what's deferred is the **trigger layer** - a queue (QStash/Inngest) firing crons and webhooks that invoke the same run path (the "scan this Google Sheet nightly" case), plus queue-backed processing for >10k-row imports (same chunk functions, different trigger).
 - **MCP-client ingestion** of the customer's connected servers (Distru MCP + QuickBooks/Sage/Metrc/Drive/Sheets) into the tool registry - the copilot's full multi-MCP tool surface and the workflows' cross-tool actions. The registry + gate/preview/audit wrapper are already the seam for it (§3.6).
-- More import targets (purchase orders, sales orders); full public-API parity (orders/invoices/assemblies).
-- Webhook retry/backoff + a delivery-inspector UI; Vercel Blob for large source files.
+- **Operator UI** for the built-but-Preview backend modules (Purchasing / Manufacturing / Compliance / Analytics screens); more import targets (purchase orders, assemblies).
+- Webhook retry/backoff + a delivery-inspector UI; Vercel Blob for large source files and product images (currently stored as data URLs).
 - RBAC beyond org membership; per-tenant model/effort tuning; an **eval harness** for column-mapping accuracy (the one place I'd invest next, since mapping quality is the product).
 
 ---

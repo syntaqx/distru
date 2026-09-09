@@ -7,27 +7,60 @@ import {
   LineChart,
   ShieldCheck,
   ShoppingCart,
-  Sparkles,
+  Tag,
   Truck,
+  Workflow,
   Zap,
 } from "lucide-react";
 import { getOrgContext } from "@/lib/session";
-import { listProducts } from "@/lib/services/products";
-import { onHandByProduct } from "@/lib/services/inventory";
-import { listCompanies } from "@/lib/services/reference";
-import { listRecentAudit } from "@/lib/services/audit";
-import { OpenCopilotButton } from "@/components/open-copilot-button";
+import { listProducts } from "@/lib/modules/catalog";
+import { onHandByProduct } from "@/lib/modules/inventory";
+import { listCompanies } from "@/lib/modules/catalog";
+import { listRecentAudit } from "@/lib/modules/shared";
+import { CopilotHero } from "@/components/dashboard/copilot-hero";
 
 export const dynamic = "force-dynamic";
 
 const ACTIVE = [
-  { href: "/inventory", label: "Inventory", desc: "Products, packages & on-hand", Icon: Boxes },
-  { href: "/companies", label: "Companies", desc: "Customers, vendors & brands", Icon: Building2 },
-  { href: "/integrations", label: "Integrations", desc: "API tokens, MCP & webhooks", Icon: Zap },
+  {
+    href: "/inventory",
+    label: "Inventory",
+    desc: "Products, packages & on-hand",
+    Icon: Boxes,
+  },
+  {
+    href: "/categories",
+    label: "Categories",
+    desc: "Organize your catalog",
+    Icon: Tag,
+  },
+  {
+    href: "/companies",
+    label: "Companies",
+    desc: "Customers, vendors & brands",
+    Icon: Building2,
+  },
+  {
+    href: "/sales",
+    label: "Sales",
+    desc: "Orders, invoices & payments",
+    Icon: ShoppingCart,
+  },
+  {
+    href: "/automations",
+    label: "Automations",
+    desc: "Tasks the Copilot runs for you",
+    Icon: Workflow,
+  },
+  {
+    href: "/integrations",
+    label: "Integrations",
+    desc: "Connect the tools you use",
+    Icon: Zap,
+  },
 ];
 
 const PREVIEW = [
-  { label: "Sales Orders", desc: "Quotes → orders → fulfillment", Icon: ShoppingCart },
   { label: "Purchasing", desc: "POs & multi-channel intake", Icon: Truck },
   { label: "Manufacturing", desc: "Assemblies, BOMs & COGS", Icon: Factory },
   { label: "Compliance", desc: "Metrc & BioTrack sync", Icon: ShieldCheck },
@@ -41,6 +74,11 @@ function actionLabel(action: string) {
     "inventory.adjust": "Adjusted inventory",
     "category.create": "Created category",
     "company.create": "Created company",
+    "order.create": "Created order",
+    "order.status": "Updated order",
+    "order.cancel": "Cancelled order",
+    "invoice.create": "Created invoice",
+    "payment.record": "Recorded payment",
     "api_token.create": "Created API token",
     "api_token.revoke": "Revoked API token",
   };
@@ -67,7 +105,11 @@ function Stat({ label, value }: { label: string; value: string | number }) {
 export default async function DashboardPage() {
   const ctx = await getOrgContext();
   if (!ctx) return null;
-  const service = { orgId: ctx.orgId, actor: ctx.actor, actorType: "user" as const };
+  const service = {
+    orgId: ctx.orgId,
+    actor: ctx.actor,
+    actorType: "user" as const,
+  };
 
   const [{ items }, onHand, companies, audit] = await Promise.all([
     listProducts(service, { limit: 500 }),
@@ -76,22 +118,16 @@ export default async function DashboardPage() {
     listRecentAudit(service, 10),
   ]);
   const units = [...onHand.values()].reduce((a, b) => a + b, 0);
-  const customers = companies.filter((c) => c.roles.includes("CUSTOMER")).length;
+  const customers = companies.filter((c) =>
+    c.roles.includes("CUSTOMER"),
+  ).length;
 
   const firstName = ctx.user.name?.split(" ")[0] ?? "there";
 
   return (
     <div className="h-full overflow-auto">
       <div className="mx-auto max-w-5xl px-6 py-8">
-        <div className="mb-6 flex items-end justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-semibold">Welcome back, {firstName}</h1>
-            <p className="text-sm text-muted">Your seed-to-sale operations, now with an agent.</p>
-          </div>
-          <OpenCopilotButton className="btn btn-primary" title="Open Copilot (⌘/Ctrl+J)">
-            <Sparkles size={16} /> Ask the Copilot
-          </OpenCopilotButton>
-        </div>
+        <CopilotHero firstName={firstName} />
 
         <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Stat label="Products" value={items.length} />
@@ -100,18 +136,14 @@ export default async function DashboardPage() {
           <Stat label="Customers" value={customers} />
         </div>
 
-        <h2 className="mb-3 text-sm font-semibold text-muted">Modules</h2>
-        <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <OpenCopilotButton
-            className="card group text-left transition-colors hover:border-accent"
-            title="Open Copilot (⌘/Ctrl+J)"
-          >
-            <Sparkles size={20} style={{ color: "var(--color-accent)" }} />
-            <div className="mt-3 font-medium">Copilot</div>
-            <div className="text-xs text-muted">Chat to run your catalog & imports</div>
-          </OpenCopilotButton>
+        <h2 className="mb-3 text-sm font-semibold text-muted">Jump back in</h2>
+        <div className="mb-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {ACTIVE.map(({ href, label, desc, Icon }) => (
-            <Link key={href} href={href} className="card group transition-colors hover:border-accent">
+            <Link
+              key={href}
+              href={href}
+              className="card group transition-colors hover:border-accent"
+            >
               <Icon size={20} style={{ color: "var(--color-accent)" }} />
               <div className="mt-3 font-medium">{label}</div>
               <div className="text-xs text-muted">{desc}</div>
@@ -119,6 +151,9 @@ export default async function DashboardPage() {
           ))}
         </div>
 
+        <h2 className="mb-3 text-sm font-semibold text-muted">
+          On the roadmap
+        </h2>
         <div className="mb-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           {PREVIEW.map(({ label, desc, Icon }) => (
             <div key={label} className="card opacity-75">
@@ -132,8 +167,9 @@ export default async function DashboardPage() {
           ))}
         </div>
         <p className="mb-8 -mt-4 text-xs text-muted">
-          Preview modules aren&apos;t built out - but the same agentic harness, service layer, and
-          public API/MCP that power Inventory are designed to power all of them next.
+          Preview modules aren&apos;t built out - but the same agentic harness,
+          service layer, and public API/MCP that power Inventory are designed to
+          power all of them next.
         </p>
 
         <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-muted">
@@ -142,11 +178,15 @@ export default async function DashboardPage() {
         <div className="card divide-y p-0">
           {audit.length === 0 && (
             <div className="p-4 text-sm text-muted">
-              No activity yet. Ask the Copilot to add a product or import a catalog.
+              No activity yet. Ask the Copilot to add a product or import a
+              catalog.
             </div>
           )}
           {audit.map((a) => (
-            <div key={a.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
+            <div
+              key={a.id}
+              className="flex items-center gap-3 px-4 py-2.5 text-sm"
+            >
               <span className="badge text-[10px]">{a.actorType}</span>
               <span className="font-medium">{actionLabel(a.action)}</span>
               <span className="text-muted">
@@ -154,7 +194,9 @@ export default async function DashboardPage() {
                   (a.after as { sku?: string } | null)?.sku ??
                   a.entityType}
               </span>
-              <span className="ml-auto text-xs text-muted">{timeAgo(a.createdAt)}</span>
+              <span className="ml-auto text-xs text-muted">
+                {timeAgo(a.createdAt)}
+              </span>
             </div>
           ))}
         </div>

@@ -1,0 +1,60 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: distru-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: distru
+      POSTGRES_PASSWORD: distru
+      POSTGRES_DB: distru
+    ports:
+      - "5432:5432"
+    volumes:
+      - distru-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U distru -d distru"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    container_name: distru-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Pulls ANTHROPIC_API_KEY, BETTER_AUTH_SECRET, etc. from your .env,
+    # then overrides DATABASE_URL below to reach Postgres over the compose network.
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://distru:distru@postgres:5432/distru
+      NODE_ENV: development
+      # The /docs page compiles Shiki (WASM grammars/themes) + Mermaid under the
+      # webpack dev server, which blows past Node's default ~2GB heap and OOMs.
+      # Give the dev server room so recompiles don't crash the container.
+      NODE_OPTIONS: "--max-old-space-size=4096"
+      # Poll for file changes so live reload works across bind mounts (Windows/WSL2).
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app # your source, bind-mounted for live reload
+      - /app/node_modules # keep the image's Linux node_modules (don't clobber with host's)
+      - /app/.next # keep the build cache inside the container
+    # Create the schema, seed the demo tenant (both idempotent), then dev with HMR.
+    # Uses --webpack because webpack honors WATCHPACK_POLLING, which is what makes
+    # hot reload fire over a bind mount on Windows/WSL2 (Turbopack ignores polling).
+    command: sh -c "npm run db:push && npm run db:seed && npx next dev --webpack -H 0.0.0.0 -p 3000"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - node -e "fetch('http://localhost:3000/sign-in').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+volumes:
+  distru-pgdata:

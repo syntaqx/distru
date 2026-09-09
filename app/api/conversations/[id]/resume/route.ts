@@ -1,5 +1,5 @@
 import { getOrgContext } from "@/lib/session";
-import { getConversation } from "@/lib/services/conversations";
+import { getConversation } from "@/lib/harness/conversations";
 import { resumeConversationTurn } from "@/lib/harness/runner";
 import { ndjsonStream } from "@/lib/harness/stream";
 import type { ToolDecision } from "@/lib/harness/types";

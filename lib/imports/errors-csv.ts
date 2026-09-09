@@ -1,6 +1,6 @@
 import Papa from "papaparse";
-import type { ServiceCtx } from "@/lib/services/context";
-import { getFile, getJob, getRowsPage } from "@/lib/services/imports";
+import type { ServiceCtx } from "@/lib/modules/shared";
+import { getFile, getJob, getRowsPage } from "@/lib/modules/imports";
 import type { RowError } from "./types";
 
 /**
