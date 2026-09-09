@@ -6,6 +6,10 @@ import { analyticsTools } from "./analytics";
 import { importTools } from "./imports";
 import { docsTools } from "./docs";
 import { workflowTools } from "./workflows";
+import { cultivationTools } from "./cultivation";
+import { purchasingTools } from "./purchasing";
+import { manufacturingTools } from "./manufacturing";
+import { complianceTools } from "./compliance";
 import { askUser } from "./ask";
 
 let registered = false;
@@ -21,6 +25,10 @@ export function ensureToolsRegistered() {
     ...importTools,
     ...docsTools,
     ...workflowTools,
+    ...cultivationTools,
+    ...purchasingTools,
+    ...manufacturingTools,
+    ...complianceTools,
     askUser,
   ]);
   registered = true;

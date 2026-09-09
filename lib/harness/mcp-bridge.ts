@@ -5,6 +5,10 @@ import { catalogTools } from "./tools/catalog";
 import { mutationTools } from "./tools/mutations";
 import { salesTools } from "./tools/sales";
 import { analyticsTools } from "./tools/analytics";
+import { cultivationTools } from "./tools/cultivation";
+import { purchasingTools } from "./tools/purchasing";
+import { manufacturingTools } from "./tools/manufacturing";
+import { complianceTools } from "./tools/compliance";
 
 /**
  * The MCP bridge: exposes the SAME harness tools the built-in Copilot uses to an
@@ -25,6 +29,10 @@ const EXPOSED: AnyTool[] = [
   ...mutationTools,
   ...salesTools,
   ...analyticsTools,
+  ...cultivationTools,
+  ...purchasingTools,
+  ...manufacturingTools,
+  ...complianceTools,
 ];
 
 /** Harness tool name (`create_order`) → Distru MCP tool name (`distru-create-order`). */

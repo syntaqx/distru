@@ -7,6 +7,7 @@ export * from "./purchasing";
 export * from "./manufacturing";
 export * from "./compliance";
 export * from "./logistics";
+export * from "./cultivation";
 export * from "./imports";
 export * from "./platform";
 export * from "./chat";

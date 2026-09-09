@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ImagePlus, Star, Trash2, X } from "lucide-react";
 import { Select } from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
 import {
   addProductImageAction,
   deleteProductImageAction,
@@ -132,8 +133,13 @@ export function ProductForm({
               </div>
               <div>
                 <label className={label}>Category</label>
-                <input className="input" list="pf-cats" value={form.category ?? ""} onChange={(e) => set("category", e.target.value)} />
-                <datalist id="pf-cats">{categories.map((c) => <option key={c} value={c} />)}</datalist>
+                <Combobox
+                  ariaLabel="Category"
+                  value={form.category ?? ""}
+                  onValueChange={(v) => set("category", v)}
+                  placeholder="Search or add a category…"
+                  options={categories.map((c) => ({ value: c, label: c }))}
+                />
               </div>
               <div>
                 <label className={label}>Subcategory</label>
@@ -147,13 +153,23 @@ export function ProductForm({
               </div>
               <div>
                 <label className={label}>Vendor</label>
-                <input className="input" list="pf-vendors" value={form.vendor ?? ""} onChange={(e) => set("vendor", e.target.value)} />
-                <datalist id="pf-vendors">{vendors.map((v) => <option key={v} value={v} />)}</datalist>
+                <Combobox
+                  ariaLabel="Vendor"
+                  value={form.vendor ?? ""}
+                  onValueChange={(v) => set("vendor", v)}
+                  placeholder="Search or add a vendor…"
+                  options={vendors.map((v) => ({ value: v, label: v }))}
+                />
               </div>
               <div>
                 <label className={label}>Brand</label>
-                <input className="input" list="pf-brands" value={form.brand ?? ""} onChange={(e) => set("brand", e.target.value)} />
-                <datalist id="pf-brands">{brands.map((b) => <option key={b} value={b} />)}</datalist>
+                <Combobox
+                  ariaLabel="Brand"
+                  value={form.brand ?? ""}
+                  onValueChange={(v) => set("brand", v)}
+                  placeholder="Search or add a brand…"
+                  options={brands.map((b) => ({ value: b, label: b }))}
+                />
               </div>
               <div>
                 <label className={label}>Strain</label>

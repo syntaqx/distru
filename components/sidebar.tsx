@@ -8,13 +8,17 @@ import {
   BookOpen,
   Boxes,
   Building2,
+  Car,
   ClipboardList,
   CreditCard,
+  Database,
   Factory,
   FileText,
   KeyRound,
   LayoutDashboard,
   type LucideIcon,
+  Package,
+  RotateCcw,
   Settings,
   ShieldCheck,
   ShoppingCart,
@@ -32,28 +36,46 @@ import { UserMenu } from "@/components/user-menu";
 type Item = { label: string; Icon: LucideIcon; href?: string };
 type Group = { label: string; items: Item[] };
 
+// Grouped by workflow so the nav mirrors how an operator actually moves through
+// Distru: overview → catalog/inventory → sell → buy & make → grow & comply.
 const MAIN: Group[] = [
   {
-    label: "Operate",
+    label: "Overview",
     items: [
       { label: "Dashboard", Icon: LayoutDashboard, href: "/dashboard" },
-      { label: "Inventory", Icon: Boxes, href: "/inventory" },
-      { label: "Categories", Icon: Tag, href: "/categories" },
-      { label: "Companies", Icon: Building2, href: "/companies" },
-      { label: "Sales", Icon: ShoppingCart, href: "/sales" },
+      { label: "Insights", Icon: BarChart3, href: "/insights" },
       { label: "Automations", Icon: Workflow, href: "/automations" },
     ],
   },
-  // Stubbed modules: one row each (not expanded sub-navs) so the shell shows the
-  // full product surface without a massive sidebar. Each lands here when built.
   {
-    label: "Modules",
+    label: "Catalog",
     items: [
-      { label: "Purchasing", Icon: Truck },
-      { label: "Manufacturing", Icon: Factory },
-      { label: "Compliance", Icon: ShieldCheck },
-      { label: "Cultivation", Icon: Sprout },
-      { label: "Insights", Icon: BarChart3 },
+      { label: "Inventory", Icon: Boxes, href: "/inventory" },
+      { label: "Packages", Icon: Package, href: "/inventory/packages" },
+      { label: "Categories", Icon: Tag, href: "/categories" },
+    ],
+  },
+  {
+    label: "Sales & CRM",
+    items: [
+      { label: "Sales", Icon: ShoppingCart, href: "/sales" },
+      { label: "Returns", Icon: RotateCcw, href: "/sales/returns" },
+      { label: "Companies", Icon: Building2, href: "/companies" },
+    ],
+  },
+  {
+    label: "Supply & Production",
+    items: [
+      { label: "Purchasing", Icon: Truck, href: "/purchasing" },
+      { label: "Manufacturing", Icon: Factory, href: "/manufacturing" },
+      { label: "Fleet", Icon: Car, href: "/fleet" },
+    ],
+  },
+  {
+    label: "Grow & Comply",
+    items: [
+      { label: "Cultivation", Icon: Sprout, href: "/cultivation" },
+      { label: "Compliance", Icon: ShieldCheck, href: "/compliance" },
     ],
   },
 ];
@@ -61,12 +83,13 @@ const MAIN: Group[] = [
 const SETTINGS: Item[] = [
   { label: "General", Icon: Settings, href: "/settings" },
   { label: "Members", Icon: Users, href: "/settings/members" },
+  { label: "Reference data", Icon: Database, href: "/settings/reference" },
   { label: "API tokens", Icon: KeyRound, href: "/settings/api-tokens" },
   { label: "Webhooks", Icon: Webhook, href: "/settings/webhooks" },
   { label: "Integrations", Icon: Zap, href: "/integrations" },
+  { label: "Audit log", Icon: ClipboardList, href: "/settings/audit-log" },
   { label: "Billing", Icon: CreditCard },
   { label: "Notifications", Icon: FileText },
-  { label: "Audit log", Icon: ClipboardList },
 ];
 
 function Row({ item, active }: { item: Item; active?: boolean }) {

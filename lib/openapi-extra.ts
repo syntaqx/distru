@@ -8,6 +8,7 @@ import * as metrc from "./openapi-fragments/metrc";
 import * as pdf from "./openapi-fragments/pdf";
 import * as actions from "./openapi-fragments/actions";
 import * as misc from "./openapi-fragments/misc";
+import * as cultivation from "./openapi-fragments/cultivation";
 
 type Rec = Record<string, unknown>;
 
@@ -17,6 +18,7 @@ export const EXTRA_PATHS: Rec = {
   ...pdf.paths,
   ...actions.paths,
   ...misc.paths,
+  ...cultivation.paths,
 };
 
 export const EXTRA_SCHEMAS: Rec = {
@@ -25,4 +27,5 @@ export const EXTRA_SCHEMAS: Rec = {
   ...pdf.schemas,
   ...actions.schemas,
   ...misc.schemas,
+  ...cultivation.schemas,
 };

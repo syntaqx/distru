@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Plus, Trash2, X } from "lucide-react";
 import { Select } from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
 import {
   createOrderAction,
   type OrderLineForm,
@@ -88,19 +89,13 @@ export function OrderForm({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={label}>Customer</label>
-              <input
-                className="input"
-                list="sales-customers"
+              <Combobox
+                ariaLabel="Customer"
                 value={customer}
-                onChange={(e) => setCustomer(e.target.value)}
-                placeholder="e.g. Green Leaf Dispensary"
-                autoFocus
+                onValueChange={setCustomer}
+                placeholder="Search or add a customer…"
+                options={customers.map((c) => ({ value: c, label: c }))}
               />
-              <datalist id="sales-customers">
-                {customers.map((c) => (
-                  <option key={c} value={c} />
-                ))}
-              </datalist>
             </div>
             <div>
               <label className={label}>On save</label>
@@ -119,25 +114,23 @@ export function OrderForm({
 
         <section className="card">
           <h2 className="mb-3 text-sm font-semibold">Line items</h2>
-          <datalist id="sales-products">
-            {products.map((p) => (
-              <option key={p.sku} value={p.sku}>
-                {p.name}
-              </option>
-            ))}
-          </datalist>
           <div className="space-y-2">
             {lines.map((line, idx) => {
               const p = skuToProduct.get(line.sku.toLowerCase());
               return (
                 <div key={idx} className="flex items-center gap-2">
-                  <input
-                    className="input flex-1"
-                    list="sales-products"
-                    value={line.sku}
-                    onChange={(e) => setLine(idx, { sku: e.target.value })}
-                    placeholder="SKU"
-                  />
+                  <div className="flex-1">
+                    <Combobox
+                      ariaLabel="Product SKU"
+                      value={line.sku}
+                      onValueChange={(v) => setLine(idx, { sku: v })}
+                      placeholder="Search products by name or SKU…"
+                      options={products.map((pr) => ({
+                        value: pr.sku,
+                        label: `${pr.name} · ${pr.sku}`,
+                      }))}
+                    />
+                  </div>
                   <span className="min-w-32 flex-1 truncate text-xs text-muted">
                     {p?.name ?? ""}
                   </span>

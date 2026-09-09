@@ -3,10 +3,12 @@ import {
   Activity,
   Boxes,
   Building2,
+  Car,
   Factory,
   LineChart,
   ShieldCheck,
   ShoppingCart,
+  Sprout,
   Tag,
   Truck,
   Workflow,
@@ -58,13 +60,15 @@ const ACTIVE = [
     desc: "Connect the tools you use",
     Icon: Zap,
   },
+  { href: "/purchasing", label: "Purchasing", desc: "POs & vendor intake", Icon: Truck },
+  { href: "/manufacturing", label: "Manufacturing", desc: "Assemblies, BOMs & COGS", Icon: Factory },
+  { href: "/compliance", label: "Compliance", desc: "Licenses, COAs & Metrc", Icon: ShieldCheck },
+  { href: "/fleet", label: "Fleet", desc: "Drivers & vehicles", Icon: Car },
+  { href: "/insights", label: "Insights", desc: "Reporting & analytics", Icon: LineChart },
 ];
 
 const PREVIEW = [
-  { label: "Purchasing", desc: "POs & multi-channel intake", Icon: Truck },
-  { label: "Manufacturing", desc: "Assemblies, BOMs & COGS", Icon: Factory },
-  { label: "Compliance", desc: "Metrc & BioTrack sync", Icon: ShieldCheck },
-  { label: "Analytics", desc: "Reporting & insights", Icon: LineChart },
+  { label: "Cultivation", desc: "Plants, harvests & lifecycle", Icon: Sprout },
 ];
 
 function actionLabel(action: string) {

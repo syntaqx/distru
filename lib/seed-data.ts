@@ -15,6 +15,13 @@ import { getProductBySku } from "@/lib/modules/catalog";
 import { findOrCreateCustomer } from "@/lib/modules/catalog";
 import { createOrder, listOrders } from "@/lib/modules/sales";
 import { createInvoiceForOrder, recordPayment } from "@/lib/modules/sales";
+import { listStrains, upsertStrain } from "@/lib/modules/catalog";
+import {
+  listPlantBatches,
+  upsertPlantBatch,
+  upsertPlant,
+  upsertHarvest,
+} from "@/lib/modules/cultivation";
 
 const UNIT_TYPES: { name: string; kind: "WEIGHT" | "VOLUME" | "COUNT" }[] = [
   { name: "Gram", kind: "WEIGHT" },
@@ -114,6 +121,59 @@ export async function provisionOrgSampleData(orgId: string) {
   if ((await listOrders(ctx)).items.length === 0) {
     await seedSampleOrders(ctx);
   }
+
+  // A starter grow so the Cultivation module isn't empty.
+  if ((await listPlantBatches(ctx)).items.length === 0) {
+    await seedCultivation(ctx);
+  }
+}
+
+/** Seed a few strains, plant batches, plants, and a harvest for the grow side. */
+async function seedCultivation(ctx: ReturnType<typeof systemCtx>) {
+  const location = await getDefaultLocation(ctx);
+  const strainNames = ["Blue Dream", "OG Kush", "Gelato", "Sour Diesel"];
+  const strainId = new Map<string, string>();
+  for (const s of (await listStrains(ctx, { limit: 200 })).items) strainId.set(s.name, s.id);
+  for (const name of strainNames) {
+    if (!strainId.has(name)) {
+      const { row } = await upsertStrain(ctx, { name });
+      strainId.set(name, row.id);
+    }
+  }
+  const veg = await upsertPlantBatch(ctx, {
+    strainId: strainId.get("Blue Dream"),
+    locationId: location.id,
+    count: 50,
+    phase: "VEGETATIVE",
+    sourceType: "Clone",
+  });
+  const flower = await upsertPlantBatch(ctx, {
+    strainId: strainId.get("OG Kush"),
+    locationId: location.id,
+    count: 32,
+    phase: "FLOWERING",
+    sourceType: "Clone",
+  });
+  await upsertPlantBatch(ctx, {
+    strainId: strainId.get("Gelato"),
+    locationId: location.id,
+    count: 24,
+    phase: "IMMATURE",
+    sourceType: "Seed",
+  });
+  for (let i = 0; i < 4; i++)
+    await upsertPlant(ctx, { strainId: strainId.get("Blue Dream"), locationId: location.id, plantBatchId: veg.row.id, phase: "FLOWERING" });
+  for (let i = 0; i < 3; i++)
+    await upsertPlant(ctx, { strainId: strainId.get("OG Kush"), locationId: location.id, plantBatchId: flower.row.id, phase: "FLOWERING" });
+  await upsertHarvest(ctx, {
+    name: "Fall Harvest A",
+    strainId: strainId.get("OG Kush"),
+    locationId: location.id,
+    plantCount: 32,
+    wetWeight: 8400,
+    dryWeight: 1680,
+    status: "ACTIVE",
+  });
 }
 
 /** Seed two confirmed orders (decrementing stock) and one paid-in-part invoice. */

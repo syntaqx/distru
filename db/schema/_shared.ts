@@ -95,6 +95,19 @@ export const returnStatus = pgEnum("return_status", [
   "CANCELED",
 ]);
 
+// Cultivation lifecycle. A plant moves IMMATURE (in a plant batch) → VEGETATIVE
+// → FLOWERING → HARVESTED, or DESTROYED at any point. Mirrors Metrc plant states.
+export const plantPhase = pgEnum("plant_phase", [
+  "IMMATURE",
+  "VEGETATIVE",
+  "FLOWERING",
+  "HARVESTED",
+  "DESTROYED",
+]);
+
+// A harvest batch is ACTIVE while drying/curing, then FINISHED when packaged.
+export const harvestStatus = pgEnum("harvest_status", ["ACTIVE", "FINISHED"]);
+
 // Order/invoice line-level adjustments beyond the item subtotal. FEE, SHIPPING
 // and TAX add to the total; DISCOUNT subtracts. Mirrors Distru's `charges`
 // collection on orders and invoices.

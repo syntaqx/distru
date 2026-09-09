@@ -74,7 +74,7 @@ Use the pencil on a row to edit a product, or the archive icon to archive it. Ar
     section: "Catalog",
     title: "Inventory and on-hand",
     summary: "How on-hand stock is tracked and adjusted, and why it's auditable.",
-    keywords: ["inventory", "on hand", "on-hand", "stock", "adjust", "set stock", "ledger", "location", "audit"],
+    keywords: ["inventory", "on hand", "on-hand", "stock", "adjust", "set stock", "ledger", "location", "audit", "packages", "batches", "bins"],
     body: `# Inventory and on-hand
 
 On-hand stock is tracked as an **append-only ledger** of movements. A product's on-hand at a location is the sum of its movements, so every change is traceable and nothing is silently overwritten.
@@ -84,6 +84,9 @@ Edit a product and set the **On hand** field. Distru posts the difference betwee
 
 ## Attribution
 Every movement records who made it - a person, the public API, an import, or an automation - in the **audit log**, alongside the reason. This is what makes on-hand trustworthy across all the ways data can change.
+
+## Beyond raw on-hand
+Distru also tracks Metrc-style lot units - **packages, batches, and bins** - beneath a product's on-hand, on the Inventory sub-nav. See [Packages, batches & bins](/docs/packages).
 
 > Ask the Copilot *"set Blue Dream 3.5g on-hand to 200"* or *"add 25 to OG Kush"* and approve the card to post the same adjustment.`,
   },
@@ -113,7 +116,7 @@ Companies are created here by hand, automatically when you name a new Vendor/Bra
     section: "Selling",
     title: "Sales orders and invoicing",
     summary: "Sell to customers, decrement inventory, invoice orders, and record payments.",
-    keywords: ["sales", "order", "orders", "sales order", "invoice", "invoicing", "payment", "customer", "fulfill", "confirm", "cancel", "revenue", "billing"],
+    keywords: ["sales", "order", "orders", "sales order", "invoice", "invoicing", "payment", "customer", "fulfill", "confirm", "cancel", "revenue", "billing", "return", "credit"],
     body: `# Sales orders and invoicing
 
 The **Sales** page is where the catalog turns into revenue. An **order** is a set of line items sold to a customer; an **invoice** is a billable snapshot of an order; and **payments** settle invoices.
@@ -130,6 +133,8 @@ Leaving Pending is the only step that moves inventory, and it does so exactly on
 
 ## Invoices and payments
 From an active (non-pending) order, create an **invoice**: it snapshots the order's full financial breakdown (subtotal, charges, discounts, taxes, total) at issue time. Its **payment status** rolls **Not paid** → **Partially paid** → **Fully paid** (and **Over paid** if you record more than the balance) as you record payments; an invoice can also be **voided** independently. The balance due is total minus payments and any credits applied.
+
+To reverse a sale, record a **return** (which restocks inventory), issue a **credit**, or see every payment in one list - all under the Sales sub-nav; see [Returns, credits & payments](/docs/returns).
 
 ## The Copilot does all of this
 Everything on this page is also an agent action, each behind a single approval:
@@ -982,9 +987,9 @@ Rows are persisted and processed in chunks; validate and commit are O(rows) with
 
 ## MVP vs deferred
 
-**Built and running:** multitenant auth and org-scoped services with an audit log; the harness (streaming loop, provider-agnostic model seam, HITL confirm and ask_user, resumable); import end to end with seven targets, detect to error CSV, 10k rows; five faces on one service layer; a public REST API + MCP spanning ~40 resource groups (130 self-documented routes) with a build-time OpenAPI drift guard; Automations with run history and per-run transcripts; the app shell (dashboard, inventory, companies, categories, sales, automations, docs, settings, integrations) with editing on real routed pages.
+**Built and running:** multitenant auth and org-scoped services with an audit log; the harness (streaming loop, provider-agnostic model seam, HITL confirm and ask_user, resumable) with ~40 tools that operate every domain; import end to end with seven targets, detect to error CSV, 10k rows; five faces on one service layer; a public REST API + MCP spanning 136 self-documented routes with a build-time OpenAPI drift guard; API-accurate mock providers (Metrc/QuickBooks/LeafLink) behind a real seam; Automations with run history and per-run transcripts; and a **routed operator screen for every domain** - dashboard, insights, inventory (+ packages/batches/bins), categories, companies, sales (+ returns/credits/payments), purchasing, manufacturing, compliance, cultivation, fleet, automations, reference data, settings, integrations, docs.
 
-**Deferred, seams in place:** queue-backed imports beyond 10k and a scheduler firing crons/webhooks into the same headless run path; MCP-client ingestion of a customer's connected servers; operator UI for the built-but-Preview backend modules (purchasing/manufacturing/compliance/analytics); an eval harness for column-mapping accuracy; RBAC beyond org membership; a real Distru/MCP adapter behind the service layer.
+**Deferred, seams in place:** queue-backed imports beyond 10k and a scheduler firing crons/webhooks into the same headless run path; MCP-client ingestion of a customer's connected servers; **live** external sync behind the mock provider seams (real Metrc/QuickBooks/LeafLink adapters); the Billing/Notifications screens (no backend); an eval harness for column-mapping accuracy; RBAC beyond org membership.
 
 ## Build it from scratch
 
@@ -1002,6 +1007,199 @@ If there were no demo, this is the order to rebuild it. Each step depends only o
 10. **Verify** - typecheck, lint (including the architecture-boundary rules), and a green production build; an offline smoke test that drives the modules and the full import pipeline against Postgres with no model spend; curl each face with a minted token.
 
 The one place worth investing next is an **eval harness for column-mapping accuracy** - mapping quality is the actual product, and it is where regression testing pays for itself immediately.`,
+  },
+  {
+    slug: "returns",
+    section: "Selling",
+    title: "Returns, credits & payments",
+    summary: "Reverse a sale with a return that restocks, record store credit, and see every payment.",
+    keywords: ["return", "returns", "credit", "credits", "store credit", "refund", "payment", "payments", "restock", "reverse", "rma", "post-sale"],
+    body: `# Returns, credits & payments
+
+Not every sale is final. The **Sales** page carries the whole post-sale flow through its sub-nav: **Orders & invoices**, **Returns**, **Credits**, and **Payments**.
+
+## Returns
+A **return** brings product back from a customer. Open **Sales, Returns**, click **New return**, pick the customer (or the originating order), and add the line items and quantities coming back. Receiving a return **restocks inventory** - each returned line posts a positive movement to the on-hand ledger (a \`return\` movement, fully auditable), the mirror of the \`sale\` that took it out. It's the same ledger that backs [inventory](/docs/inventory), so on-hand stays trustworthy.
+
+## Credits
+A **credit** is store credit owed to a customer - from a return, a goodwill adjustment, or an overpayment. Record one under **Sales, Credits** with an amount and a reason. An open credit can be **applied to an invoice**, reducing its balance due alongside payments (an invoice's balance is total minus payments minus credits applied).
+
+## Payments
+**Sales, Payments** lists every payment recorded against your invoices - amount, method, date, and the invoice it settled. Recording a payment happens from an invoice (see [Sales orders and invoicing](/docs/sales)); this view is the read-across of all of them, so you can see what's come in without opening each invoice one by one.
+
+> The Copilot handles the post-sale flow too: *"Return 3 Blue Dream 3.5g from Green Leaf's last order"* restocks them, and *"apply a $40 credit to INV-0006"* draws down the balance - each behind a single approval.`,
+  },
+  {
+    slug: "packages",
+    section: "Catalog",
+    title: "Packages, batches & bins",
+    summary: "Metrc-style lot units under Inventory: what packages, batches, and bins are, and creating them.",
+    keywords: ["package", "packages", "batch", "batches", "bin", "bins", "lot", "metrc tag", "traceability", "storage", "sub-nav"],
+    body: `# Packages, batches & bins
+
+Cannabis compliance tracks inventory in discrete, tagged units, not just a running total. Under **Inventory**, the sub-nav splits into **Products**, **Packages**, **Batches**, and **Bins** - the Metrc-style lot units that sit beneath a product's on-hand.
+
+## What each is
+- **Package** - a specific, tagged quantity of a product (a Metrc-style package tag identifies it). Packages are how regulated product physically moves and is reported to the state.
+- **Batch** - a production or harvest lot that packages descend from; it ties units back to a common source for traceability and recall.
+- **Bin** - a storage location within a facility (a shelf, room, or zone) where packages sit. Bins are about *where* stock is, distinct from the [locations](/docs/reference-data) that define your sites.
+
+## Creating them
+Open the relevant sub-nav tab and click **New**. A **bin** needs a name; a **batch** captures its source and identifier; a **package** references its product, quantity, and (where present) its Metrc tag and parent batch. Packages and batches carry the lot fields a Metrc sync reads and writes - see [Compliance](/docs/compliance) for how that synced state surfaces read-only in the Metrc view.
+
+> Bins are ordinary catalog records you create, edit, and delete; package and batch lot tracking is modeled with its Metrc linkage in place, so the same units you set up here are what the compliance view reflects.`,
+  },
+  {
+    slug: "purchasing",
+    section: "Operations",
+    title: "Purchase orders",
+    summary: "Buy from vendors: create a PO, work the DRAFT to OPEN to RECEIVED lifecycle, and receive stock in.",
+    keywords: ["purchase order", "purchase", "purchasing", "po", "vendor", "buying", "receive", "receiving", "draft", "open", "received", "restock", "procurement"],
+    body: `# Purchase orders
+
+Purchasing is how stock comes *in*. A **purchase order** (PO) is a commitment to buy product from a vendor; receiving it is the mirror image of a sale - where a sales order **decrements** on-hand, receiving a PO **increments** it.
+
+## Create a PO
+On the **Purchasing** page click **New purchase order**, pick a **vendor** (a company with the VENDOR role - see [Companies](/docs/companies)), and add **line items**: each is a product, a quantity, and a unit cost. Save it and the PO opens in DRAFT.
+
+## The lifecycle
+A PO moves through three states:
+- **DRAFT** - being built or reviewed. No inventory effect.
+- **OPEN** - issued to the vendor and awaiting delivery. Still no stock change.
+- **RECEIVED** - the goods arrived. **Receiving the PO increments stock**: every line posts a positive movement to the on-hand ledger (a \`purchase\` movement, attributed and auditable), so your on-hand reflects the delivery the moment you receive it.
+
+Receiving is the only step that moves inventory, and like a sale it happens exactly once.
+
+> The Copilot can do this end to end: *"Draft a PO to Sungrown Farms for 50 Blue Dream 3.5g at $12"* creates it, and *"receive PO-0004"* books the stock in - each human-in-the-loop gated, and available over the MCP server for your own agent to drive.`,
+  },
+  {
+    slug: "manufacturing",
+    section: "Operations",
+    title: "Assemblies & manufacturing",
+    summary: "Turn inputs into outputs with assemblies (BOMs) and roll up their costs.",
+    keywords: ["manufacturing", "assembly", "assemblies", "bom", "bill of materials", "production", "inputs", "outputs", "cost", "costs", "cost type", "packaging"],
+    body: `# Assemblies & manufacturing
+
+Manufacturing turns inputs into outputs - packaging bulk flower into eighths, building pre-roll multipacks, producing edibles from ingredients. Distru models this as an **assembly**.
+
+## Assemblies and BOMs
+An **assembly** is a bill of materials (BOM): a set of **input line items** (the products and quantities consumed) that produce an **output product** (and quantity). On the **Manufacturing** page, click **New assembly**, choose the output product, and add the inputs with their quantities.
+
+## Costs
+An assembly can carry **costs** beyond the input products themselves - labor, packaging, overhead - each recorded against a **cost type**. Together with the input product values, these give the output an all-in cost, so margin on the finished good reflects what it actually took to make.
+
+> The Copilot can create assemblies for you: *"Build an assembly that turns 1 lb of Blue Dream bulk into 128 eighths"* - shown for approval first, and callable over the MCP server. Assembly modeling is in place; posting the input/output inventory movements on completion is the documented next step.`,
+  },
+  {
+    slug: "fleet",
+    section: "Operations",
+    title: "Fleet",
+    summary: "Keep your delivery drivers and vehicles ready to assign to outbound orders.",
+    keywords: ["fleet", "driver", "drivers", "vehicle", "vehicles", "delivery", "dispatch", "logistics", "van", "truck", "roster"],
+    body: `# Fleet
+
+Deliveries need drivers and vehicles. The **Fleet** page is where you keep both, ready to assign to outbound orders.
+
+## Drivers
+A **driver** is a person who runs deliveries. Add one with a name and contact details, and maintain the roster as staff change.
+
+## Vehicles
+A **vehicle** is a delivery vehicle - a van, truck, or car - tracked by name or plate. Keep the fleet list current so dispatch reflects what's actually on the road.
+
+## Assignment
+Drivers and vehicles are maintained here today; attaching them to an order's fulfillment (who is delivering which order, in what vehicle) is the documented follow-up, building on the sales fulfillment lifecycle in [Sales orders and invoicing](/docs/sales).
+
+> Fleet records are ordinary catalog-style entries - create, edit, and delete drivers and vehicles as your operation changes.`,
+  },
+  {
+    slug: "compliance",
+    section: "Compliance & Cultivation",
+    title: "Compliance: licenses, COAs & Metrc",
+    summary: "Manage licenses, record lab results (COAs) with a PDF link, and read your synced Metrc state.",
+    keywords: ["compliance", "license", "licenses", "coa", "certificate of analysis", "lab test", "lab results", "metrc", "track and trace", "transfers", "tags", "pdf"],
+    body: `# Compliance: licenses, COAs & Metrc
+
+Regulated operators live and die by paperwork. The **Compliance** page keeps your licenses, lab results, and state track-and-trace view in one place.
+
+## Licenses
+Record each **license** your business holds - its number, type, and validity - so the details are on hand for reporting and audits. Open **Compliance**, click **New license**, and fill in the license type and identifier.
+
+## Lab results (COAs)
+A **test result**, or **Certificate of Analysis (COA)**, captures a lab's potency and safety testing for a product or batch. Record the results and attach a **PDF link** to the COA document, so the certificate is one click from the record it belongs to.
+
+## The Metrc view
+Compliance includes a **read-only Metrc view** that reflects your synced state track-and-trace data - **packages**, **transfers**, and **tags** as Metrc sees them. It's populated by the mock Metrc provider behind a real integration seam, so the view shows the shape and flow of synced compliance state without a live state connection. The linkage fields (package tags, lab-test ids) live on your [packages and batches](/docs/packages), so records line up on both sides.
+
+> The Copilot can file compliance records for you: *"Add our California distributor license C11-0000123"* or *"record a COA for batch BD-2409 with this lab PDF"* - each human-in-the-loop gated, and available over the MCP server. The Metrc view stays read-only; syncing to a live state system is the documented follow-up.`,
+  },
+  {
+    slug: "cultivation",
+    section: "Compliance & Cultivation",
+    title: "Cultivation",
+    summary: "Track the grow: plant batches to plants (phase advance) to harvests with wet and dry weight.",
+    keywords: ["cultivation", "grow", "plant", "plants", "plant batch", "harvest", "harvests", "phase", "immature", "vegetative", "flowering", "harvested", "wet weight", "dry weight", "strain"],
+    body: `# Cultivation
+
+Seed-to-sale starts in the grow. The **Cultivation** page tracks living inventory from clone to harvest, so what you eventually package traces back to the plants it came from.
+
+## The grow lifecycle
+- **Plant batches** - a group of plants started together (a propagation run from a strain). Create one under Cultivation with its strain and count.
+- **Plants** - the individual plants in a batch. Each advances through the grow **phases**: **IMMATURE → VEGETATIVE → FLOWERING → HARVESTED**. Advancing a plant's phase moves it one step along that lifecycle.
+- **Harvests** - when plants reach the end, record a **harvest** capturing **wet weight** and, after drying, **dry weight**. The harvest is what links the finished, weighable product back to the batch and strain that produced it - feeding the [batches and packages](/docs/packages) that carry it forward.
+
+## Creating and advancing
+Start a **plant batch** (strain + count), let it grow, and **advance the phase** as the plants develop. At the end, record the **harvest** with its weights.
+
+> The Copilot runs the grow with you: *"Start a plant batch of 24 Blue Dream clones"*, *"advance batch BD-24 to flowering"*, and *"log a harvest of 4,200g wet on batch BD-24"* - each human-in-the-loop gated, and available over the MCP server for your own agent.`,
+  },
+  {
+    slug: "insights",
+    section: "Overview",
+    title: "Insights & reporting",
+    summary: "The analytics dashboard - top products/customers, inventory valuation - and 18 report endpoints over the API.",
+    keywords: ["insights", "reporting", "reports", "analytics", "dashboard", "top products", "best sellers", "top customers", "inventory valuation", "revenue", "collections", "metrics"],
+    body: `# Insights & reporting
+
+Beyond the day-to-day pages, Distru rolls your data up into analytics - what's selling, who's buying, and what your stock is worth.
+
+## The analytics dashboard
+The **Insights** dashboard surfaces the numbers you check most:
+- **Top products** - your best sellers by revenue or units over a period.
+- **Top customers** - who's buying the most, so you know your key accounts.
+- **Inventory valuation** - what your on-hand stock is currently worth.
+
+These read from the same source of truth as every page, so the dashboard never disagrees with the underlying orders and [inventory ledger](/docs/inventory).
+
+## Reporting over the API
+The same analytics are available programmatically. Distru exposes **18 report endpoints** over the public API and MCP server - sales summaries (revenue + AR), best sellers, top customers, open-invoice / collections reports, inventory valuation, and more - so an external agent or BI tool can answer "how are sales?" and "who owes us money?" without scraping the UI. See [API, MCP, and webhooks](/docs/api-and-integrations) for connecting a client.
+
+> Ask the Copilot *"what are my top 5 products this month?"* or *"what's my current inventory value?"* - it reads the same reports and answers in chat, no approval needed since nothing changes.`,
+  },
+  {
+    slug: "reference-data",
+    section: "Settings",
+    title: "Reference data",
+    summary: "Curate the shared lists - taxes, price tiers, terms, strains, groups, menus, locations (unit types are read-only).",
+    keywords: ["reference data", "settings", "tax", "taxes", "price tier", "payment terms", "payment methods", "strain", "strains", "subcategory", "subcategories", "product group", "company group", "menu", "menus", "location", "unit type"],
+    body: `# Reference data
+
+Most pages lean on small shared lists - the taxes you charge, the tiers you price at, the terms you sell on. **Settings** is where you curate that reference data so it's consistent everywhere it's used.
+
+## What you can manage
+- **Taxes** - tax rates applied to orders and invoices.
+- **Price tiers** - named pricing levels (wholesale, retail, VIP) for customer-specific pricing.
+- **Payment terms** - net terms (Net 15, Net 30) offered on invoices.
+- **Payment methods** - how payments are recorded (cash, check, ACH, card).
+- **Strains** - cannabis strains referenced by products and [cultivation](/docs/cultivation).
+- **Subcategories** - finer classification beneath a product [category](/docs/products).
+- **Product groups** and **company groups** - groupings for reporting and bulk work.
+- **Menus** - curated product lists for sharing or publishing.
+- **Locations** - your physical sites (warehouses, rooms), also importable in bulk (see [Importing data](/docs/importing)).
+
+## Managing it
+Each list has its own Settings section where you create, rename, and remove entries. One list is deliberately **read-only**: **unit types** (Gram, Ounce, Unit, and so on) are a fixed, compliance-relevant set you pick from but can't invent - the same constraint the [product form](/docs/products) and imports enforce.
+
+> The Copilot leans on this reference data when it works - naming a price tier, a tax, or a strain it already knows - so keeping these lists tidy makes everything else it does more accurate.`,
   },
 ];
 
