@@ -185,17 +185,19 @@ The dependency direction is enforced by ESLint (`eslint.config.mjs`): domain mod
 
 | Var | Value |
 |---|---|
-| `DATABASE_URL` | A **pooled** Neon / Vercel Postgres connection string. |
+| `DATABASE_URL` | A **pooled** Postgres string. With the **Neon / Vercel Postgres integration**, this is auto-detected from its `POSTGRES_URL`, so you don't need to set it by hand. |
 | `BETTER_AUTH_SECRET` | A strong random secret (`openssl rand -base64 32`). |
 | `BETTER_AUTH_URL` | The deployed origin, e.g. `https://distru.syntaqx.com`. |
 | `APP_URL` | Same deployed origin. |
 | `ANTHROPIC_API_KEY` | For the Copilot / automations / AI graph-authoring. |
 
-**Optional:** `ANTHROPIC_MODEL` (default `claude-opus-5`), `ANTHROPIC_WORKSPACE_ID` (only for workspace-scoped keys); `MODEL_PROVIDER=openai` + `OPENAI_API_KEY` (+ `OPENAI_MODEL` / `OPENAI_BASE_URL`) to run on OpenAI instead; the integration/delivery seams `METRC_PROVIDER` / `ACCOUNTING_PROVIDER` / `MARKETPLACE_PROVIDER` / `TRACEABILITY_PROVIDER` / `EMAIL_PROVIDER` / `DRIVE_PROVIDER` (all default `mock`, so the demo works out of the box; set to `none` to show them unconnected).
+**Optional:** `ANTHROPIC_MODEL` (default `claude-opus-5`), `ANTHROPIC_WORKSPACE_ID` (attributes usage to a specific workspace); `MODEL_PROVIDER=openai` + `OPENAI_API_KEY` (+ `OPENAI_MODEL` / `OPENAI_BASE_URL`) to run on OpenAI instead; the integration/delivery seams `METRC_PROVIDER` / `ACCOUNTING_PROVIDER` / `MARKETPLACE_PROVIDER` / `TRACEABILITY_PROVIDER` / `EMAIL_PROVIDER` / `DRIVE_PROVIDER` (all default `mock`, so the demo works out of the box; set to `none` to show them unconnected).
 
-**Scheduled automations:** set `CRON_SECRET` to a random string. [`vercel.json`](./vercel.json) already defines a Vercel Cron that calls `/api/workflows/tick`; Vercel automatically sends `Authorization: Bearer $CRON_SECRET`, which the endpoint checks. The default schedule is hourly (fires daily/weekly workflows on time); tighten to `*/5 * * * *` on Vercel Pro for minute-level accuracy.
+**Migrations + seed run on deploy.** The `vercel-build` script runs `db:push` (schema sync) then `db:seed` before `next build`, so the first deploy comes up fully migrated **and** seeded with the demo tenant. Both are safe to re-run: `db:push` reconciles the schema, and the seed is idempotent (ensure-user/org, upsert-by-SKU, and guarded sample/showcase steps), so later deploys no-op. `db:push` uses the **direct/unpooled** connection (`DATABASE_URL_UNPOOLED` / `POSTGRES_URL_NON_POOLING`, provided by the Neon integration) for DDL.
 
-**One-time schema push:** the build doesn't migrate the database. After setting `DATABASE_URL`, run `DATABASE_URL="<prod-string>" npm run db:push` once (add `npm run db:seed` if you want the demo tenant). Otherwise it's Vercel-native - no other config.
+**Scheduled automations:** set `CRON_SECRET` to a random string. [`vercel.json`](./vercel.json) defines a Vercel Cron on `/api/workflows/tick`; Vercel automatically sends `Authorization: Bearer $CRON_SECRET`, which the endpoint checks. Hourly by default (fires daily/weekly workflows on time); tighten to `*/5 * * * *` on Pro for minute-level accuracy.
+
+**Nightly staging reset (demo only):** to reset the demo every night to a lived-in state (catalog, sales, cultivation, plus showcase Reports, a completed automation run, and notifications), set `ENABLE_STAGING_RESET=1`. `vercel.json` has a `0 0 * * *` (00:00 UTC) cron on `/api/staging/reset`, gated by both that flag **and** `CRON_SECRET`. It's destructive (full DB wipe + reseed) - enable it **only** on the throwaway demo project, never a real database. Cron times are UTC; adjust the hour for your timezone.
 
 ---
 

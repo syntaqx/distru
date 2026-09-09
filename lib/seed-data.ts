@@ -1,6 +1,16 @@
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { unitTypes } from "@/db/schema";
+import { artifacts, unitTypes, workflowRuns, workflows } from "@/db/schema";
 import { systemCtx } from "@/lib/modules/shared";
+import { listProducts } from "@/lib/modules/catalog";
+import { onHandByProduct } from "@/lib/modules/inventory";
+import {
+  createArtifact,
+  formatReport,
+  listArtifacts,
+  runReport,
+} from "@/lib/modules/reports";
+import { createNotification } from "@/lib/modules/notifications";
 import {
   _resetUnitTypeCache,
   findOrCreateCompany,
@@ -164,6 +174,107 @@ export async function provisionOrgSampleData(orgId: string) {
   // A starter grow so the Cultivation module isn't empty.
   if ((await listPlantBatches(ctx)).items.length === 0) {
     await seedCultivation(ctx);
+  }
+
+  // Showcase: pre-made Reports, a completed automation run, and notifications,
+  // so Reports / Automations history / the bell all feel lived-in on a fresh reset.
+  await seedShowcase(ctx);
+}
+
+/**
+ * Generate real Report artifacts from the seeded data (via the report registry -
+ * no LLM), attach one to a completed run of the Low-stock automation, and drop a
+ * few notifications. Idempotent: skips if any artifacts already exist.
+ */
+async function seedShowcase(ctx: ReturnType<typeof systemCtx>) {
+  if ((await listArtifacts(ctx, { limit: 1 })).length > 0) return;
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Two rich snapshot reports from the standard registry.
+  for (const spec of [
+    { name: "sales-by-product", label: "Sales by product" },
+    { name: "inventory-valuation", label: "Inventory valuation" },
+  ]) {
+    const r = await runReport(ctx, spec.name);
+    if (!r) continue;
+    const art = await createArtifact(ctx, {
+      title: `${spec.label} - ${today}`,
+      content: formatReport(r.columns, r.rows, "markdown"),
+      kind: "report",
+      format: "markdown",
+    });
+    await createNotification(ctx, {
+      userId: null,
+      kind: "report.ready",
+      title: `Report ready: ${art.title}`,
+      href: `/reports?id=${art.id}`,
+    });
+  }
+
+  // A "Low-stock report" (the five lowest-stocked products) attached to a
+  // completed run of the seeded Low-stock automation - as if the 8am schedule
+  // fired this morning.
+  const { items } = await listProducts(ctx, { limit: 200, status: "ACTIVE" });
+  const onHand = await onHandByProduct(ctx);
+  const lowest = items
+    .map((p) => ({ sku: p.product.sku, name: p.product.name, qty: onHand.get(p.product.id) ?? 0 }))
+    .sort((a, b) => a.qty - b.qty)
+    .slice(0, 5);
+  const lowContent =
+    `# Low-stock report - ${today}\n\nThe five lowest-stocked active products.\n\n` +
+    `| SKU | Product | On hand |\n|---|---|---|\n` +
+    lowest.map((r) => `| ${r.sku} | ${r.name} | ${r.qty} |`).join("\n");
+  const lowArt = await createArtifact(ctx, {
+    title: `Low-stock report - ${today}`,
+    content: lowContent,
+    kind: "report",
+    format: "markdown",
+  });
+
+  const wf = (await listWorkflows(ctx)).find((w) => w.name === "Low-stock report");
+  if (wf) {
+    const finishedAt = new Date();
+    const startedAt = new Date(finishedAt.getTime() - 4200);
+    const summary = `Found the 5 lowest-stocked products and saved the report. Lowest: ${lowest[0]?.name ?? "n/a"} (${lowest[0]?.qty ?? 0}).`;
+    const [run] = await db
+      .insert(workflowRuns)
+      .values({
+        organizationId: ctx.orgId,
+        workflowId: wf.id,
+        status: "success",
+        summary,
+        trigger: "schedule",
+        nodeRuns: [
+          {
+            nodeId: "agent",
+            type: "agent",
+            name: "Low-stock agent",
+            status: "success",
+            summary,
+            conversationId: null,
+            startedAt: startedAt.toISOString(),
+            finishedAt: finishedAt.toISOString(),
+          },
+        ],
+        createdAt: startedAt,
+        finishedAt,
+      })
+      .returning();
+    await db
+      .update(artifacts)
+      .set({ workflowRunId: run.id, workflowId: wf.id })
+      .where(eq(artifacts.id, lowArt.id));
+    await db
+      .update(workflows)
+      .set({ lastRunAt: finishedAt, lastRunStatus: "success" })
+      .where(eq(workflows.id, wf.id));
+    await createNotification(ctx, {
+      userId: null,
+      kind: "workflow.success",
+      title: "Low-stock report finished",
+      body: summary,
+      href: `/automations?wf=${wf.id}&run=${run.id}`,
+    });
   }
 }
 

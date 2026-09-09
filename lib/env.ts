@@ -1,7 +1,9 @@
 /** Centralized, typed access to environment configuration. */
 export const env = {
   databaseUrl:
-    process.env.DATABASE_URL ?? "postgres://distru:distru@localhost:5432/distru",
+    process.env.DATABASE_URL ??
+    process.env.POSTGRES_URL ??
+    "postgres://distru:distru@localhost:5432/distru",
   betterAuthSecret:
     process.env.BETTER_AUTH_SECRET ?? "dev-secret-change-me-please-0000000000000000",
   betterAuthUrl: process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
@@ -12,6 +14,9 @@ export const env = {
   // Shared secret guarding the scheduler tick endpoint (/api/workflows/tick).
   // When set, callers must present it as `Authorization: Bearer <secret>`.
   cronSecret: process.env.CRON_SECRET ?? "",
+  // Opt-in flag that must be "1"/"true" to allow the DESTRUCTIVE nightly staging
+  // reset (/api/staging/reset). Set only on the demo/staging deployment.
+  enableStagingReset: /^(1|true)$/i.test(process.env.ENABLE_STAGING_RESET ?? ""),
   // Which model provider the harness talks to. The runner is provider-agnostic;
   // this picks the adapter (see lib/harness/providers). Default: anthropic.
   modelProvider: (process.env.MODEL_PROVIDER ?? "anthropic").toLowerCase(),

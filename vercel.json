@@ -4,6 +4,10 @@
     {
       "path": "/api/workflows/tick",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/staging/reset",
+      "schedule": "0 0 * * *"
     }
   ]
 }

@@ -2,8 +2,13 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./schema";
 
+// Runtime uses the POOLED connection. Accept the Neon/Vercel Postgres
+// integration's `POSTGRES_URL` as a fallback so no manual `DATABASE_URL` is
+// needed when that integration is wired in.
 const connectionString =
-  process.env.DATABASE_URL ?? "postgres://distru:distru@localhost:5432/distru";
+  process.env.DATABASE_URL ??
+  process.env.POSTGRES_URL ??
+  "postgres://distru:distru@localhost:5432/distru";
 
 /**
  * A single postgres.js client, reused across hot reloads / serverless
@@ -16,7 +21,9 @@ const globalForDb = globalThis as unknown as {
 
 const client =
   globalForDb.__distruPg ??
-  postgres(connectionString, { max: 10, prepare: false });
+  // `onnotice` is silenced so routine NOTICEs (e.g. TRUNCATE ... CASCADE during
+  // the staging reset) don't flood the logs.
+  postgres(connectionString, { max: 10, prepare: false, onnotice: () => {} });
 
 if (process.env.NODE_ENV !== "production") globalForDb.__distruPg = client;
 
