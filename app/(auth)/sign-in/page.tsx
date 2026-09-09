@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signIn } from "@/lib/auth-client";
+import { SocialButtons } from "@/components/auth/social-buttons";
 
 export default function SignInPage() {
   const router = useRouter();
@@ -27,32 +27,31 @@ export default function SignInPage() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="card space-y-4">
-      <div>
-        <h1 className="text-lg font-semibold">Welcome back</h1>
-        <p className="text-sm text-muted">Sign in to your workspace.</p>
+    <div className="space-y-5">
+      <h1 className="text-center text-xl font-semibold tracking-tight">Log in to Distru</h1>
+
+      <form onSubmit={onSubmit} className="space-y-3">
+        <div>
+          <label className="label">Email</label>
+          <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        </div>
+        <div>
+          <label className="label">Password</label>
+          <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+        </div>
+        {error && <p className="text-sm text-danger">{error}</p>}
+        <button className="btn btn-primary w-full" disabled={loading}>
+          {loading ? "Signing in…" : "Continue with Email"}
+        </button>
+      </form>
+
+      <div className="flex items-center gap-3 text-xs text-muted">
+        <span className="h-px flex-1 bg-border" />
+        or
+        <span className="h-px flex-1 bg-border" />
       </div>
-      <div>
-        <label className="label">Email</label>
-        <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-      </div>
-      <div>
-        <label className="label">Password</label>
-        <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-      </div>
-      {error && <p className="text-sm text-danger">{error}</p>}
-      <button className="btn btn-primary w-full" disabled={loading}>
-        {loading ? "Signing in…" : "Sign in"}
-      </button>
-      <p className="text-center text-sm text-muted">
-        No account?{" "}
-        <Link href="/sign-up" className="text-accent hover:underline">
-          Create one
-        </Link>
-      </p>
-      <div className="rounded-lg border border-dashed p-3 text-xs text-muted">
-        Demo tenant is pre-filled - just click <span className="text-fg">Sign in</span>.
-      </div>
-    </form>
+
+      <SocialButtons />
+    </div>
   );
 }

@@ -211,29 +211,37 @@ body {
     background: var(--color-accent);
     color: var(--color-accentfg);
   }
-  .btn-primary:hover {
+  .btn-primary:hover:not(:disabled) {
     background: var(--color-accent2);
   }
   .btn-ghost {
     @apply text-fg;
     background: transparent;
   }
-  .btn-ghost:hover {
+  .btn-ghost:hover:not(:disabled) {
     background: var(--color-surface2);
   }
   .btn-outline {
     @apply border;
     background: var(--color-surface);
   }
-  .btn-outline:hover {
+  .btn-outline:hover:not(:disabled) {
     background: var(--color-surface2);
   }
   .btn-danger {
     background: color-mix(in oklab, var(--color-danger) 12%, transparent);
     color: var(--color-danger);
   }
-  .btn-danger:hover {
+  .btn-danger:hover:not(:disabled) {
     background: color-mix(in oklab, var(--color-danger) 20%, transparent);
+  }
+  .tooltip-content {
+    @apply z-50 max-w-xs rounded-md px-2.5 py-1.5 text-xs font-medium shadow-md;
+    background: var(--color-fg);
+    color: var(--color-surface);
+  }
+  .tooltip-arrow {
+    fill: var(--color-fg);
   }
   .card {
     @apply rounded-xl border p-4;

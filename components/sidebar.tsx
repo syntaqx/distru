@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { ArrowLeft, BookOpen, Settings } from "lucide-react";
 import { listDocs } from "@/lib/docs/content";
 import { UserMenu } from "@/components/user-menu";
+import { DemoResetNotice } from "@/components/demo-reset-notice";
 import {
   ALL_MAIN,
   NAV_GROUPS,
@@ -209,6 +210,7 @@ export function Sidebar({
       </nav>
 
       <div className="border-t p-2">
+        <DemoResetNotice variant="pill" />
         <UserMenu userName={userName} userEmail={userEmail} />
       </div>
     </aside>
