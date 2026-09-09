@@ -109,7 +109,7 @@ export function TokensClient({
       )}
 
       <h2 className="mb-3 mt-8 flex items-center gap-2 text-sm font-semibold">
-        <span className="text-[var(--color-accent)]">{"{}"}</span>
+        <span className="text-accent">{"{}"}</span>
         Public REST API (Distru-compatible)
       </h2>
       <p className="mb-2 text-sm text-muted">List products (Bearer auth, page[number] pagination, string-numbers):</p>
@@ -122,7 +122,7 @@ export function TokensClient({
       <CodeBlock code={`curl -X POST ${appUrl}/api/upload-products \\\n  -H "Authorization: Bearer ${sampleToken}" \\\n  -F file=@catalog.csv`} />
 
       <h2 className="mb-3 mt-8 flex items-center gap-2 text-sm font-semibold">
-        <span className="text-[var(--color-accent)]">◇</span>
+        <span className="text-accent">◇</span>
         MCP server (drive Distru from your own agent)
       </h2>
       <p className="mb-2 text-sm text-muted">Add to any MCP client (Claude Code, Claude Desktop, Cursor):</p>

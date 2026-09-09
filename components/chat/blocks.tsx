@@ -72,23 +72,23 @@ export function ToolBlock({ block }: { block: Extract<ChatBlock, { type: "tool" 
         />
         <span className="font-medium">{toolLabel(block.name)}</span>
         {block.summary && (
-          <span className="truncate text-[var(--color-muted)]">- {block.summary}</span>
+          <span className="truncate text-muted">- {block.summary}</span>
         )}
-        <span className="ml-auto text-[var(--color-muted)]">
+        <span className="ml-auto text-muted">
           {open ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
         </span>
       </button>
       {data?.errorReportUrl && (
         <a
           href={data.errorReportUrl}
-          className="mt-2 inline-flex items-center gap-1 text-xs text-[var(--color-accent)] hover:underline"
+          className="mt-2 inline-flex items-center gap-1 text-xs text-accent hover:underline"
         >
           <Download size={13} /> Download error CSV
         </a>
       )}
       {open && (
         <pre
-          className="mt-2 max-h-64 overflow-auto rounded-md border p-2 text-xs text-[var(--color-muted)]"
+          className="mt-2 max-h-64 overflow-auto rounded-md border p-2 text-xs text-muted"
           style={{ background: "var(--color-bg)" }}
         >
           {JSON.stringify(block.data ?? {}, null, 2)}
@@ -104,14 +104,14 @@ export function ThinkingBlock({ text }: { text: string }) {
   return (
     <div className="text-xs">
       <button
-        className="flex items-center gap-1 text-[var(--color-muted)] hover:underline"
+        className="flex items-center gap-1 text-muted hover:underline"
         onClick={() => setOpen((v) => !v)}
       >
         {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
         {open ? "Hide reasoning" : "Show reasoning"}
       </button>
       {open && (
-        <p className="mt-1 whitespace-pre-wrap border-l pl-3 italic text-[var(--color-muted)]">{text}</p>
+        <p className="mt-1 whitespace-pre-wrap border-l pl-3 italic text-muted">{text}</p>
       )}
     </div>
   );

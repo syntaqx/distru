@@ -27,7 +27,7 @@ export function UserMenu({ userName, userEmail }: { userName: string; userEmail:
     <div className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-[var(--color-surface2)]"
+        className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-surface2"
       >
         <span
           className="grid size-8 shrink-0 place-items-center rounded-full text-xs font-semibold"
@@ -57,12 +57,12 @@ export function UserMenu({ userName, userEmail }: { userName: string; userEmail:
             <Link
               href="/docs"
               onClick={() => setOpen(false)}
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-[var(--color-surface2)]"
+              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-surface2"
             >
               <BookOpen size={15} /> Docs
             </Link>
             <button
-              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-[var(--color-surface2)]"
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-surface2"
               onClick={async () => {
                 setOpen(false);
                 await signOut();

@@ -52,7 +52,7 @@ export default function OnboardingPage() {
         <form onSubmit={onSubmit} className="card space-y-4">
           <div>
             <h1 className="text-lg font-semibold">Create your workspace</h1>
-            <p className="text-sm text-[var(--color-muted)]">
+            <p className="text-sm text-muted">
               Each workspace is an isolated Distru tenant.
             </p>
           </div>
@@ -66,7 +66,7 @@ export default function OnboardingPage() {
               required
             />
           </div>
-          <label className="flex items-center gap-2 text-sm text-[var(--color-muted)]">
+          <label className="flex items-center gap-2 text-sm text-muted">
             <input
               type="checkbox"
               checked={samples}
@@ -74,7 +74,7 @@ export default function OnboardingPage() {
             />
             Seed a sample catalog + inventory to explore
           </label>
-          {error && <p className="text-sm text-[var(--color-danger)]">{error}</p>}
+          {error && <p className="text-sm text-danger">{error}</p>}
           <button className="btn btn-primary w-full" disabled={loading || !name}>
             {loading ? "Setting up…" : "Create workspace"}
           </button>

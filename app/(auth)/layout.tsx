@@ -8,7 +8,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           <Logo className="text-lg" />
         </div>
         {children}
-        <p className="mt-6 text-center text-xs text-[var(--color-muted)]">
+        <p className="mt-6 text-center text-xs text-muted">
           The agentic AI layer for the Distru cannabis ERP.
         </p>
       </div>

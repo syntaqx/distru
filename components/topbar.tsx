@@ -72,7 +72,7 @@ export function TopBar({
       </form>
 
       <button
-        className="relative rounded-lg p-2 hover:bg-[var(--color-surface2)]"
+        className="relative rounded-lg p-2 hover:bg-surface2"
         onClick={() => setBell((v) => !v)}
         aria-label="Notifications"
       >

@@ -96,7 +96,7 @@ export function Combobox({
           />
           <ChevronDown
             size={15}
-            className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--color-muted)]"
+            className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-muted"
           />
         </div>
       </Popover.Anchor>

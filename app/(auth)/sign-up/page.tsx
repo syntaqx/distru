@@ -31,7 +31,7 @@ export default function SignUpPage() {
     <form onSubmit={onSubmit} className="card space-y-4">
       <div>
         <h1 className="text-lg font-semibold">Create your account</h1>
-        <p className="text-sm text-[var(--color-muted)]">Start running your catalog with AI.</p>
+        <p className="text-sm text-muted">Start running your catalog with AI.</p>
       </div>
       <div>
         <label className="label">Name</label>
@@ -45,13 +45,13 @@ export default function SignUpPage() {
         <label className="label">Password</label>
         <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={8} required />
       </div>
-      {error && <p className="text-sm text-[var(--color-danger)]">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
       <button className="btn btn-primary w-full" disabled={loading}>
         {loading ? "Creating…" : "Create account"}
       </button>
-      <p className="text-center text-sm text-[var(--color-muted)]">
+      <p className="text-center text-sm text-muted">
         Already have an account?{" "}
-        <Link href="/sign-in" className="text-[var(--color-accent)] hover:underline">
+        <Link href="/sign-in" className="text-accent hover:underline">
           Sign in
         </Link>
       </p>

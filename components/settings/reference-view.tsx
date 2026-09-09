@@ -192,7 +192,7 @@ export function ReferenceView({ data }: { data: ReferenceData }) {
             onClick={() => selectResource(r.key)}
             aria-current={active === r.key ? "page" : undefined}
             className={`rounded-lg px-3 py-2 text-left text-sm transition-colors ${
-              active === r.key ? "font-medium" : "text-muted hover:text-[var(--color-fg)]"
+              active === r.key ? "font-medium" : "text-muted hover:text-fg"
             }`}
             style={active === r.key ? { background: "var(--color-surface)", color: "var(--color-accent)" } : undefined}
           >

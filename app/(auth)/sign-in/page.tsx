@@ -30,7 +30,7 @@ export default function SignInPage() {
     <form onSubmit={onSubmit} className="card space-y-4">
       <div>
         <h1 className="text-lg font-semibold">Welcome back</h1>
-        <p className="text-sm text-[var(--color-muted)]">Sign in to your workspace.</p>
+        <p className="text-sm text-muted">Sign in to your workspace.</p>
       </div>
       <div>
         <label className="label">Email</label>
@@ -40,18 +40,18 @@ export default function SignInPage() {
         <label className="label">Password</label>
         <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
       </div>
-      {error && <p className="text-sm text-[var(--color-danger)]">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
       <button className="btn btn-primary w-full" disabled={loading}>
         {loading ? "Signing in…" : "Sign in"}
       </button>
-      <p className="text-center text-sm text-[var(--color-muted)]">
+      <p className="text-center text-sm text-muted">
         No account?{" "}
-        <Link href="/sign-up" className="text-[var(--color-accent)] hover:underline">
+        <Link href="/sign-up" className="text-accent hover:underline">
           Create one
         </Link>
       </p>
-      <div className="rounded-lg border border-dashed p-3 text-xs text-[var(--color-muted)]">
-        Demo tenant is pre-filled - just click <span className="text-[var(--color-fg)]">Sign in</span>.
+      <div className="rounded-lg border border-dashed p-3 text-xs text-muted">
+        Demo tenant is pre-filled - just click <span className="text-fg">Sign in</span>.
       </div>
     </form>
   );

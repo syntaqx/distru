@@ -33,12 +33,12 @@ export function GateCard({
         </span>
         <span className="text-sm font-medium">{p.title}</span>
       </div>
-      <p className="mt-1 text-sm text-[var(--color-muted)]">{p.summary}</p>
+      <p className="mt-1 text-sm text-muted">{p.summary}</p>
       {p.fields.length > 0 && (
         <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
           {p.fields.map((f, i) => (
             <div key={i} className="contents">
-              <dt className="text-[var(--color-muted)]">{f.label}</dt>
+              <dt className="text-muted">{f.label}</dt>
               <dd className="font-medium">{f.value}</dd>
             </div>
           ))}
@@ -90,7 +90,7 @@ function QuestionCard({
       </div>
       <p className="mt-1 text-sm font-medium">{p.question}</p>
       {decided ? (
-        <div className="mt-2 text-sm text-[var(--color-accent)]">
+        <div className="mt-2 text-sm text-accent">
           ✓ {decided.decision === "answer" ? decided.value : "Answered"}
         </div>
       ) : (

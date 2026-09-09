@@ -50,7 +50,7 @@ export function Select({
       >
         <SelectPrimitive.Value placeholder={placeholder} />
         <SelectPrimitive.Icon asChild>
-          <ChevronDown size={15} className="shrink-0 text-[var(--color-muted)]" />
+          <ChevronDown size={15} className="shrink-0 text-muted" />
         </SelectPrimitive.Icon>
       </SelectPrimitive.Trigger>
       <SelectPrimitive.Portal>

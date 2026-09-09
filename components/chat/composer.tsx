@@ -103,7 +103,7 @@ export function Composer({
             </button>
           )}
         </div>
-        <p className="mt-1.5 text-center text-[11px] text-[var(--color-muted)]">
+        <p className="mt-1.5 text-center text-[11px] text-muted">
           Mutations require your approval. Distru Copilot can make mistakes - review changes.
         </p>
       </div>

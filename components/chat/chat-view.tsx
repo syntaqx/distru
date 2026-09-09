@@ -466,7 +466,7 @@ export function ChatView({
                       <button
                         key={s}
                         onClick={() => sendMessage(s)}
-                        className="block w-full rounded-lg border px-3 py-2 text-left text-sm text-muted transition-colors hover:border-accent hover:text-[var(--color-fg)]"
+                        className="block w-full rounded-lg border px-3 py-2 text-left text-sm text-muted transition-colors hover:border-accent hover:text-fg"
                         style={{ background: "var(--color-bg)" }}
                       >
                         {s}

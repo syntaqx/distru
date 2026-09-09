@@ -47,7 +47,7 @@ export function OrgSwitcher({ initialName }: { initialName: string }) {
     <div className="relative w-full">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-[var(--color-surface2)]"
+        className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-surface2"
       >
         <span
           className="grid size-6 shrink-0 place-items-center rounded-md text-[11px] font-semibold"
@@ -79,7 +79,7 @@ export function OrgSwitcher({ initialName }: { initialName: string }) {
                   key={o.id}
                   onClick={() => switchTo(o.id)}
                   disabled={busy}
-                  className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-[var(--color-surface2)]"
+                  className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-surface2"
                 >
                   <span
                     className="grid size-6 shrink-0 place-items-center rounded-md text-[10px] font-semibold"

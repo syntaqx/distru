@@ -215,7 +215,7 @@ body {
     background: var(--color-accent2);
   }
   .btn-ghost {
-    @apply text-[var(--color-fg)];
+    @apply text-fg;
     background: transparent;
   }
   .btn-ghost:hover {
@@ -298,6 +298,6 @@ body {
     background: var(--color-surface2);
   }
   .label {
-    @apply block text-xs font-medium text-[var(--color-muted)] mb-1.5;
+    @apply block text-xs font-medium text-muted mb-1.5;
   }
 }
