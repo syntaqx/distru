@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Car, IdCard, Pencil, Plus, Search, Truck } from "lucide-react";
+import { IdCard, Pencil, Plus, Search, Truck } from "lucide-react";
 
 export type DriverRow = {
   id: string;
@@ -48,9 +48,9 @@ export function FleetManager({
       (v.licensePlate ?? "").toLowerCase().includes(query),
   );
 
-  const tabs: { key: Tab; label: string; Icon: typeof Truck }[] = [
-    { key: "drivers", label: "Drivers", Icon: IdCard },
-    { key: "vehicles", label: "Vehicles", Icon: Car },
+  const tabs: { key: Tab; label: string }[] = [
+    { key: "drivers", label: "Drivers" },
+    { key: "vehicles", label: "Vehicles" },
   ];
 
   return (
@@ -67,21 +67,24 @@ export function FleetManager({
         ))}
       </div>
 
-      <div className="mb-4 flex items-center gap-1 border-b">
-        {tabs.map(({ key, label, Icon }) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
-            className={`inline-flex items-center gap-2 border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
-              tab === key
-                ? "border-accent text-fg"
-                : "border-transparent text-muted hover:text-fg"
-            }`}
-          >
-            <Icon size={15} />
-            {label}
-          </button>
-        ))}
+      <div className="mb-4">
+        <div
+          className="inline-flex rounded-lg border p-0.5"
+          style={{ background: "var(--color-surface)" }}
+        >
+          {tabs.map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
+                tab === key ? "text-fg" : "text-muted hover:text-fg"
+              }`}
+              style={tab === key ? { background: "var(--color-surface2)" } : undefined}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="mb-4 flex items-center gap-2">

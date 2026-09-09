@@ -3,6 +3,7 @@ import { listProducts } from "@/lib/modules/catalog";
 import { onHandByProduct } from "@/lib/modules/inventory";
 import { listCategories, listCompanies, listUnitTypes } from "@/lib/modules/catalog";
 import { InventoryManager, type Row } from "@/components/inventory/inventory-manager";
+import { InventorySubnav } from "@/components/inventory/inventory-subnav";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +48,7 @@ export default async function InventoryPage({
         </p>
       </header>
       <div className="flex-1 overflow-auto p-6">
+        <InventorySubnav />
         <InventoryManager
           rows={rows}
           categories={cats.map((c) => c.name)}

@@ -1,34 +1,34 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
 /**
- * Segmented tab bar across the Sales area, styled like the orders/invoices
- * control in `sales-manager.tsx`. Rendered at the top of each sales page inside
- * the scroll area, above the content.
+ * The single tab bar for the whole Sales area, on every sales page. Orders and
+ * Invoices are two views of `/sales` (switched via `?view=`); Returns/Credits/
+ * Payments are their own routes. One consistent control everywhere.
  */
 const TABS = [
-  { label: "Orders & invoices", href: "/sales" },
+  { label: "Orders", href: "/sales" },
+  { label: "Invoices", href: "/sales?view=invoices" },
   { label: "Returns", href: "/sales/returns" },
   { label: "Credits", href: "/sales/credits" },
   { label: "Payments", href: "/sales/payments" },
 ] as const;
 
-function isActive(pathname: string, href: string) {
-  if (href === "/sales") {
-    // Orders & invoices owns the base plus the order/invoice detail routes.
-    return (
-      pathname === "/sales" ||
-      pathname.startsWith("/sales/orders") ||
-      pathname.startsWith("/sales/invoices")
-    );
-  }
-  return pathname === href || pathname.startsWith(`${href}/`);
-}
-
 export function SalesSubnav() {
   const pathname = usePathname();
+  const view = useSearchParams().get("view");
+
+  function isActive(href: string): boolean {
+    if (href === "/sales")
+      return (pathname === "/sales" && view !== "invoices") || pathname.startsWith("/sales/orders");
+    if (href === "/sales?view=invoices")
+      return (pathname === "/sales" && view === "invoices") || pathname.startsWith("/sales/invoices");
+    const base = href.split("?")[0];
+    return pathname === base || pathname.startsWith(`${base}/`);
+  }
+
   return (
     <div className="mb-6">
       <div
@@ -36,10 +36,10 @@ export function SalesSubnav() {
         style={{ background: "var(--color-surface)" }}
       >
         {TABS.map((t) => {
-          const active = isActive(pathname, t.href);
+          const active = isActive(t.href);
           return (
             <Link
-              key={t.href}
+              key={t.label}
               href={t.href}
               className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
                 active ? "text-fg" : "text-muted hover:text-fg"

@@ -8,10 +8,16 @@ import {
   type OrderRow,
   type TopSellerRow,
 } from "@/components/sales/sales-manager";
+import { SalesSubnav } from "@/components/sales/sales-subnav";
 
 export const dynamic = "force-dynamic";
 
-export default async function SalesPage() {
+export default async function SalesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ view?: string }>;
+}) {
+  const view = (await searchParams).view === "invoices" ? "invoices" : "orders";
   const ctx = await getOrgContext();
   if (!ctx) return null;
   const service = {
@@ -127,10 +133,12 @@ export default async function SalesPage() {
         </p>
       </header>
       <div className="flex-1 overflow-auto p-6">
+        <SalesSubnav />
         <SalesManager
           orders={orders}
           invoices={invoices}
           topSellers={topSellers}
+          view={view}
         />
       </div>
     </div>

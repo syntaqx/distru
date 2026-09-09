@@ -3,6 +3,7 @@ import { hasAnthropicKey } from "@/lib/anthropic";
 import {
   appendMessage,
   getConversation,
+  hasPendingToolCalls,
   renameConversation,
 } from "@/lib/harness/conversations";
 import { getFile, getJob } from "@/lib/modules/imports";
@@ -19,13 +20,23 @@ export async function POST(
   const conv = await getConversation(ctx, id);
   if (!conv) return new Response("not found", { status: 404 });
 
+  const service = { orgId: ctx.orgId, actor: ctx.actor, actorType: "user" as const };
+
+  // Don't start a new turn while a gated tool call is still awaiting approval -
+  // that would strand the open tool_use without a tool_result. The client blocks
+  // this too, but a stale tab or a fast double-submit could still race here.
+  if (await hasPendingToolCalls(service, id)) {
+    return Response.json(
+      { error: "Resolve the pending action (approve or reject) before sending a new message." },
+      { status: 409 },
+    );
+  }
+
   const body = (await req.json().catch(() => ({}))) as {
     text?: string;
     importJobId?: string;
     pageContext?: string | null;
   };
-
-  const service = { orgId: ctx.orgId, actor: ctx.actor, actorType: "user" as const };
 
   let text = (body.text ?? "").trim();
 

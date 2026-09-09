@@ -1,17 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Bell, ChevronRight, Search, Sparkles } from "lucide-react";
-
-const SECTIONS: { prefix: string; label: string }[] = [
-  { prefix: "/dashboard", label: "Dashboard" },
-  { prefix: "/inventory", label: "Inventory" },
-  { prefix: "/companies", label: "Companies" },
-  { prefix: "/integrations", label: "Integrations" },
-  { prefix: "/docs", label: "Docs" },
-  { prefix: "/settings", label: "Settings" },
-];
+import { breadcrumbTrail } from "@/components/nav-config";
 
 export function TopBar({
   onToggleCopilot,
@@ -22,7 +15,7 @@ export function TopBar({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const section = SECTIONS.find((s) => pathname.startsWith(s.prefix));
+  const crumbs = breadcrumbTrail(pathname);
   const [query, setQuery] = useState("");
   const [bell, setBell] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -40,9 +33,22 @@ export function TopBar({
 
   return (
     <div className="relative z-20 flex flex-1 items-center gap-3 px-4">
-      <nav className="flex items-center gap-1.5 text-sm">
-        <ChevronRight size={14} className="text-muted" />
-        <span className="font-medium">{section?.label ?? "Overview"}</span>
+      <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-sm">
+        {crumbs.map((c, i) => {
+          const last = i === crumbs.length - 1;
+          return (
+            <span key={`${c.label}-${i}`} className="flex items-center gap-1">
+              {i > 0 && <ChevronRight size={13} className="text-muted" />}
+              {c.href && !last ? (
+                <Link href={c.href} className="text-muted transition-colors hover:text-fg">
+                  {c.label}
+                </Link>
+              ) : (
+                <span className={last ? "font-medium" : "text-muted"}>{c.label}</span>
+              )}
+            </span>
+          );
+        })}
       </nav>
 
       <form

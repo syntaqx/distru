@@ -84,14 +84,17 @@ export function SalesManager({
   orders,
   invoices,
   topSellers,
+  view = "orders",
 }: {
   orders: OrderRow[];
   invoices: InvoiceRow[];
   topSellers: TopSellerRow[];
+  /** Which view the Sales sub-nav selected (`?view=`); the tab bar lives in the page. */
+  view?: "orders" | "invoices";
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [tab, setTab] = useState<"orders" | "invoices">("orders");
+  const tab = view;
   const [error, setError] = useState<string | null>(null);
 
   const revenue = orders
@@ -168,26 +171,8 @@ export function SalesManager({
         </div>
       )}
 
-      <div className="mb-4 flex items-center gap-2">
-        <div
-          className="flex rounded-lg border p-0.5"
-          style={{ background: "var(--color-surface)" }}
-        >
-          {(["orders", "invoices"] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`rounded-md px-3 py-1.5 text-sm capitalize transition-colors ${
-                tab === t ? "text-fg" : "text-muted hover:text-fg"
-              }`}
-              style={
-                tab === t ? { background: "var(--color-surface2)" } : undefined
-              }
-            >
-              {t}
-            </button>
-          ))}
-        </div>
+      <div className="mb-4 flex items-center">
+        <h2 className="text-sm font-semibold capitalize">{tab}</h2>
         <Link href="/sales/orders/new" className="btn btn-primary ml-auto">
           <Plus size={16} /> New order
         </Link>

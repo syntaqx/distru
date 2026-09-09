@@ -2,95 +2,20 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  ArrowLeft,
-  BarChart3,
-  BookOpen,
-  Boxes,
-  Building2,
-  Car,
-  ClipboardList,
-  CreditCard,
-  Database,
-  Factory,
-  FileText,
-  KeyRound,
-  LayoutDashboard,
-  type LucideIcon,
-  Package,
-  RotateCcw,
-  Settings,
-  ShieldCheck,
-  ShoppingCart,
-  Sprout,
-  Tag,
-  Truck,
-  Users,
-  Webhook,
-  Workflow,
-  Zap,
-} from "lucide-react";
+import { ArrowLeft, BookOpen, Settings } from "lucide-react";
 import { listDocs } from "@/lib/docs/content";
 import { UserMenu } from "@/components/user-menu";
+import {
+  ALL_MAIN,
+  NAV_GROUPS,
+  SETTINGS_ITEMS,
+  activeHref,
+  type NavItem,
+} from "@/components/nav-config";
 
-type Item = { label: string; Icon: LucideIcon; href?: string };
-type Group = { label: string; items: Item[] };
-
-// Grouped by workflow so the nav mirrors how an operator actually moves through
-// Distru: overview → catalog/inventory → sell → buy & make → grow & comply.
-const MAIN: Group[] = [
-  {
-    label: "Overview",
-    items: [
-      { label: "Dashboard", Icon: LayoutDashboard, href: "/dashboard" },
-      { label: "Insights", Icon: BarChart3, href: "/insights" },
-      { label: "Automations", Icon: Workflow, href: "/automations" },
-    ],
-  },
-  {
-    label: "Catalog",
-    items: [
-      { label: "Inventory", Icon: Boxes, href: "/inventory" },
-      { label: "Packages", Icon: Package, href: "/inventory/packages" },
-      { label: "Categories", Icon: Tag, href: "/categories" },
-    ],
-  },
-  {
-    label: "Sales & CRM",
-    items: [
-      { label: "Sales", Icon: ShoppingCart, href: "/sales" },
-      { label: "Returns", Icon: RotateCcw, href: "/sales/returns" },
-      { label: "Companies", Icon: Building2, href: "/companies" },
-    ],
-  },
-  {
-    label: "Supply & Production",
-    items: [
-      { label: "Purchasing", Icon: Truck, href: "/purchasing" },
-      { label: "Manufacturing", Icon: Factory, href: "/manufacturing" },
-      { label: "Fleet", Icon: Car, href: "/fleet" },
-    ],
-  },
-  {
-    label: "Grow & Comply",
-    items: [
-      { label: "Cultivation", Icon: Sprout, href: "/cultivation" },
-      { label: "Compliance", Icon: ShieldCheck, href: "/compliance" },
-    ],
-  },
-];
-
-const SETTINGS: Item[] = [
-  { label: "General", Icon: Settings, href: "/settings" },
-  { label: "Members", Icon: Users, href: "/settings/members" },
-  { label: "Reference data", Icon: Database, href: "/settings/reference" },
-  { label: "API tokens", Icon: KeyRound, href: "/settings/api-tokens" },
-  { label: "Webhooks", Icon: Webhook, href: "/settings/webhooks" },
-  { label: "Integrations", Icon: Zap, href: "/integrations" },
-  { label: "Audit log", Icon: ClipboardList, href: "/settings/audit-log" },
-  { label: "Billing", Icon: CreditCard },
-  { label: "Notifications", Icon: FileText },
-];
+type Item = NavItem;
+const MAIN = NAV_GROUPS;
+const SETTINGS = SETTINGS_ITEMS;
 
 function Row({ item, active }: { item: Item; active?: boolean }) {
   const { Icon } = item;
@@ -152,6 +77,9 @@ export function Sidebar({
     : pathname.startsWith("/docs")
       ? "docs"
       : "main";
+  // Exactly one main item is active: the most-specific href that owns the path,
+  // so /sales/returns highlights "Returns" only (not "Sales" too).
+  const mainActive = activeHref(pathname, ALL_MAIN);
 
   return (
     <aside
@@ -251,9 +179,7 @@ export function Sidebar({
                     <Row
                       key={item.label}
                       item={item}
-                      active={
-                        item.href ? pathname.startsWith(item.href) : false
-                      }
+                      active={!!item.href && item.href === mainActive}
                     />
                   ))}
                 </div>

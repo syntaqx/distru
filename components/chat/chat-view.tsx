@@ -71,6 +71,10 @@ export function ChatView({
   const [history, setHistory] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // Synchronous mutex: one turn (send or resume) in flight at a time. `streaming`
+  // and `pending` are async state, so they update a tick too late to block a
+  // second rapid Enter; this ref is set synchronously and closes that window.
+  const inFlightRef = useRef(false);
 
   async function openConversation(id: string) {
     setConversationId(id);
@@ -186,6 +190,16 @@ export function ChatView({
         body: JSON.stringify(body),
         signal: controller.signal,
       });
+      if (!res.ok) {
+        // A non-streaming error (e.g. 409 pending action). Surface it instead of
+        // trying to parse the JSON body as an NDJSON stream.
+        const msg = await res
+          .json()
+          .then((j: { error?: string }) => j.error)
+          .catch(() => null);
+        setError(msg ?? `Request failed (${res.status}).`);
+        return;
+      }
       await readNdjson(res, applyEvent);
     } catch (e) {
       if ((e as Error).name !== "AbortError")
@@ -210,14 +224,22 @@ export function ChatView({
   }
 
   async function sendMessage(text: string, importJobId?: string) {
-    setError(null);
-    const id = await ensureConversation();
-    setBlocks((prev) => [...prev, { type: "user", text }]);
-    await runRequest(`/api/conversations/${id}/messages`, {
-      text,
-      importJobId,
-      pageContext: pageLabel(pathname),
-    });
+    // Ignore a second send while a turn is in flight or awaiting approval - both
+    // guard the async window that `disabled`/`streaming` props miss.
+    if (inFlightRef.current || pending.length > 0) return;
+    inFlightRef.current = true;
+    try {
+      setError(null);
+      const id = await ensureConversation();
+      setBlocks((prev) => [...prev, { type: "user", text }]);
+      await runRequest(`/api/conversations/${id}/messages`, {
+        text,
+        importJobId,
+        pageContext: pageLabel(pathname),
+      });
+    } finally {
+      inFlightRef.current = false;
+    }
   }
 
   async function uploadFile(file: File): Promise<{ jobId: string; rowCount: number } | null> {
@@ -236,7 +258,13 @@ export function ChatView({
   }
 
   async function resume(id: string, decs: ToolDecision[]) {
-    await runRequest(`/api/conversations/${id}/resume`, { decisions: decs });
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
+    try {
+      await runRequest(`/api/conversations/${id}/resume`, { decisions: decs });
+    } finally {
+      inFlightRef.current = false;
+    }
   }
 
   function onDecide(d: ToolDecision) {

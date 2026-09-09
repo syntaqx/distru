@@ -130,6 +130,26 @@ export async function recordToolCall(
   return row;
 }
 
+/**
+ * True if the conversation has a gated tool call still awaiting a decision. A new
+ * message turn must not start until it's resolved, or the open `tool_use` would be
+ * left without a `tool_result` and the message sequence would break.
+ */
+export async function hasPendingToolCalls(ctx: ServiceCtx, conversationId: string) {
+  const [row] = await db
+    .select({ id: toolCalls.id })
+    .from(toolCalls)
+    .where(
+      and(
+        eq(toolCalls.organizationId, ctx.orgId),
+        eq(toolCalls.conversationId, conversationId),
+        eq(toolCalls.status, "pending"),
+      ),
+    )
+    .limit(1);
+  return !!row;
+}
+
 export async function getToolCall(ctx: ServiceCtx, toolUseId: string) {
   const [row] = await db
     .select()
