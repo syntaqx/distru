@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Bell,
   Boxes,
   Building2,
   Car,
@@ -13,6 +14,7 @@ import {
   type LucideIcon,
   Package,
   RotateCcw,
+  ScrollText,
   Settings,
   ShieldCheck,
   ShoppingCart,
@@ -37,8 +39,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Overview",
     items: [
       { label: "Dashboard", Icon: LayoutDashboard, href: "/dashboard" },
-      { label: "Insights", Icon: BarChart3, href: "/insights" },
-      { label: "Automations", Icon: Workflow, href: "/automations" },
+      { label: "Notifications", Icon: Bell, href: "/notifications" },
     ],
   },
   {
@@ -72,6 +73,14 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: "Compliance", Icon: ShieldCheck, href: "/compliance" },
     ],
   },
+  {
+    label: "Automate & Analyze",
+    items: [
+      { label: "Insights", Icon: BarChart3, href: "/insights" },
+      { label: "Reports", Icon: ScrollText, href: "/reports" },
+      { label: "Automations", Icon: Workflow, href: "/automations" },
+    ],
+  },
 ];
 
 export const SETTINGS_ITEMS: NavItem[] = [
@@ -80,10 +89,10 @@ export const SETTINGS_ITEMS: NavItem[] = [
   { label: "Reference data", Icon: Database, href: "/settings/reference" },
   { label: "API tokens", Icon: KeyRound, href: "/settings/api-tokens" },
   { label: "Webhooks", Icon: Webhook, href: "/settings/webhooks" },
-  { label: "Integrations", Icon: Zap, href: "/integrations" },
+  { label: "Integrations", Icon: Zap, href: "/settings/integrations" },
   { label: "Audit log", Icon: ClipboardList, href: "/settings/audit-log" },
   { label: "Billing", Icon: CreditCard },
-  { label: "Notifications", Icon: FileText },
+  { label: "Notification prefs", Icon: FileText },
 ];
 
 /** Does `href` cover `pathname` (exact, or a parent segment - never a partial word)? */

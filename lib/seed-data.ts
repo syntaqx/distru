@@ -105,15 +105,54 @@ export async function provisionOrgSampleData(orgId: string) {
     }
   }
 
-  // A sample automation so the Automations page is discoverable out of the box.
+  // A sample automation so the Automations canvas is discoverable out of the box:
+  // a scheduled trigger -> an AI-agent node with an inventory tool wired into it.
   if ((await listWorkflows(ctx)).length === 0) {
+    const instruction =
+      "Find every active product with on-hand below 25 units and list them with " +
+      "their SKU and current on-hand, lowest first, as a markdown table. Then call " +
+      "save_report to save it (title 'Low-stock report - <today>'). Read-only; do " +
+      "not change any data. If an email recipient is configured, email it with email_report.";
     await createWorkflow(ctx, {
       name: "Low-stock report",
-      instruction:
-        "Find every active product with on-hand below 25 units and list them " +
-        "with their SKU and current on-hand, lowest first. This is a read-only " +
-        "report; do not change any data.",
-      trigger: "manual",
+      instruction,
+      graph: {
+        nodes: [
+          {
+            id: "trigger",
+            type: "trigger.schedule",
+            name: "Every morning",
+            params: { cron: "0 8 * * *", description: "Every day at 8:00am" },
+            position: { x: 80, y: 160 },
+          },
+          {
+            id: "agent",
+            type: "agent",
+            name: "Low-stock agent",
+            params: { instruction, maxSteps: 8 },
+            position: { x: 360, y: 160 },
+          },
+          {
+            id: "tool_inv",
+            type: "tool",
+            name: "inventory_report",
+            params: { tool: "inventory_report" },
+            position: { x: 360, y: 380 },
+          },
+          {
+            id: "tool_save",
+            type: "tool",
+            name: "save_report",
+            params: { tool: "save_report" },
+            position: { x: 520, y: 380 },
+          },
+        ],
+        connections: {
+          trigger: { main: [[{ node: "agent" }]] },
+          tool_inv: { ai_tool: [[{ node: "agent" }]] },
+          tool_save: { ai_tool: [[{ node: "agent" }]] },
+        },
+      },
     });
   }
 

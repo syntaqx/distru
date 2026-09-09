@@ -57,7 +57,7 @@ The Copilot is a **floating window** you can open on any page (from the topbar b
 - *"Add a product: Gelato 3.5g, SKU FL-GEL-35, Flower, vendor Sungrown Farms, unit gram, $34"* → **approve** the card → watch it appear on the **Inventory** page behind the window.
 - *"Set Blue Dream 3.5g on-hand to 200."*
 - *"Sell 10 Blue Dream 3.5g and 5 OG Kush 3.5g to Green Leaf Dispensary"* → **approve** the order card → inventory drops on the **Inventory** page and the order lands on **Sales**. Then *"invoice that order"* and *"record a $200 payment on INV-0003."*
-- *"Save an automation that lists every SKU under 25 units"* → then open the Copilot's **history → Automations** tab and hit **Run now**. Automations run unattended (they auto-approve their own actions); a **Low-stock report** is seeded to try.
+- Open **Automations** and build a workflow on the **canvas** - drag a trigger, an **AI Agent** node, and wire **Tool** sub-nodes into its tool port (the n8n model, with AI as a first-class node) - or hit **Generate** and describe it in plain language (*"every weekday at 8am, find SKUs under 25 units and draft POs to their default vendor"*). Hit **Run** to execute it and watch per-node status light up; **schedule** triggers fire for real on a cron. Runs are unattended (they auto-approve their own actions); a starter automation is seeded to try.
 **Just drop in a CSV** - drag it straight onto the Copilot (or use the paperclip). The agent detects what the file is and asks what to do; you don't have to say "import this." Ready-made samples in `samples/`:
 
 | File | What it shows |
@@ -149,13 +149,13 @@ The MCP tool list is **derived from the Copilot's own tool registry** (via [`lib
 The exercise asked for a tech spec + Loom. I also built the working platform behind it:
 
 - **A real multitenant SaaS**, not a demo - BetterAuth orgs/members, UUIDv7 everywhere, org-scoped services, deployable to Vercel; an app shell modeled on Distru's real modules, with a **routed operator screen for every domain** - Inventory (+ Packages/Batches/Bins), Sales (+ Returns/Credits/Payments), Purchasing, Manufacturing, Compliance (+ a live Metrc view), Cultivation (plant batches → plants → harvests), Fleet, Insights, Companies, Automations, Reference data - and the Copilot drives all of them.
-- **The harness as the product**: a tool registry, a streaming agent loop, a **human-in-the-loop gate** (every mutation is Approve/Reject; `ask_user` for real decisions) that **pauses mid-turn, persists, and resumes** across stateless invocations, and a cross-face **audit log**. It's trigger-agnostic: the same runner powers both the chat Copilot and unattended **Automations** - saved workflows that run headlessly and auto-approve their own actions (attributed to the workflow in the audit log).
+- **The harness as the product**: a tool registry, a streaming agent loop, a **human-in-the-loop gate** (every mutation is Approve/Reject; `ask_user` for real decisions) that **pauses mid-turn, persists, and resumes** across stateless invocations, and a cross-face **audit log**. It's trigger-agnostic: the same runner powers both the chat Copilot and unattended **Automations** - a **visual workflow engine** where an AI-agent node (scoped to the tools wired into it) composes with deterministic action/if/transform nodes on a React Flow canvas, authored by hand or from a prompt, and fired manually or on a real cron. And it produces **real outcomes**: agents save durable **Reports** (an artifacts section), **email** them or **upload to Google Drive** through the integration seam (mock-connected), and every completed run drops a **notification** with a deep link to its results.
 - **Five faces on one service layer** (copilot, public REST API, MCP server, bulk engine, webhooks), all verified writing to one DB.
 - **A generic import framework**: detection + "what do you want to do with this?" + mapping + chunked validation + partial commit + error CSV - new import types are a single file (`lib/imports/targets/`), so it scales to the long tail (products, price sheets, customer/vendor lists, inventory counts, sales orders today).
 - **The agent orchestrates; deterministic code does the heavy lifting** - 10k rows live in Postgres, never in the model's context.
 - **Engineering rigor**: typecheck + lint clean, green production build, and **GitHub Actions CI on Node 24** (Postgres service → typecheck → lint → build → push → seed → smoke).
 
-**Honest scope:** this repo *is* Distru - a faithful clone of the surface, not wired to production Distru. The external integrations (Metrc/BioTrack, QuickBooks, LeafLink) run on **API-accurate mock providers behind a real provider seam** (env-selected; a live adapter drops in without touching routes or serializers) rather than being faked inline - see `DISTRU-PARITY.md`. Every nav item is a working routed screen; the only remaining **Preview** tiles are **Billing** and **Notifications** (no backend). The public REST API + MCP span **136 self-documented routes**, field-accurate to Distru's real OpenAPI, and the Copilot has ~40 HITL-gated tools that operate every domain.
+**Honest scope:** this repo *is* Distru - a faithful clone of the surface, not wired to production Distru. The external integrations (Metrc/BioTrack, QuickBooks, LeafLink) run on **API-accurate mock providers behind a real provider seam** (env-selected; a live adapter drops in without touching routes or serializers) rather than being faked inline - see `DISTRU-PARITY.md`. Every nav item is a working routed screen; the only remaining **Preview** tile is **Billing** (no backend). The public REST API + MCP span **136 self-documented routes**, field-accurate to Distru's real OpenAPI, and the Copilot has ~60 HITL-gated tools that operate every domain - including producing **Reports** and delivering them by email / Google Drive.
 
 ---
 
@@ -181,7 +181,21 @@ The dependency direction is enforced by ESLint (`eslint.config.mjs`): domain mod
 
 ## Deploy (Vercel)
 
-Set `DATABASE_URL` to a pooled Neon / Vercel Postgres string, plus `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `APP_URL`, and a model provider: `ANTHROPIC_API_KEY` (default), or set `MODEL_PROVIDER=openai` with `OPENAI_API_KEY` (optionally `OPENAI_MODEL` / `OPENAI_BASE_URL`). Run `npm run db:push` against that database. Otherwise it's Vercel-native.
+**Required env vars:**
+
+| Var | Value |
+|---|---|
+| `DATABASE_URL` | A **pooled** Neon / Vercel Postgres connection string. |
+| `BETTER_AUTH_SECRET` | A strong random secret (`openssl rand -base64 32`). |
+| `BETTER_AUTH_URL` | The deployed origin, e.g. `https://distru.syntaqx.com`. |
+| `APP_URL` | Same deployed origin. |
+| `ANTHROPIC_API_KEY` | For the Copilot / automations / AI graph-authoring. |
+
+**Optional:** `ANTHROPIC_MODEL` (default `claude-opus-5`), `ANTHROPIC_WORKSPACE_ID` (only for workspace-scoped keys); `MODEL_PROVIDER=openai` + `OPENAI_API_KEY` (+ `OPENAI_MODEL` / `OPENAI_BASE_URL`) to run on OpenAI instead; the integration/delivery seams `METRC_PROVIDER` / `ACCOUNTING_PROVIDER` / `MARKETPLACE_PROVIDER` / `TRACEABILITY_PROVIDER` / `EMAIL_PROVIDER` / `DRIVE_PROVIDER` (all default `mock`, so the demo works out of the box; set to `none` to show them unconnected).
+
+**Scheduled automations:** set `CRON_SECRET` to a random string. [`vercel.json`](./vercel.json) already defines a Vercel Cron that calls `/api/workflows/tick`; Vercel automatically sends `Authorization: Bearer $CRON_SECRET`, which the endpoint checks. The default schedule is hourly (fires daily/weekly workflows on time); tighten to `*/5 * * * *` on Vercel Pro for minute-level accuracy.
+
+**One-time schema push:** the build doesn't migrate the database. After setting `DATABASE_URL`, run `DATABASE_URL="<prod-string>" npm run db:push` once (add `npm run db:seed` if you want the demo tenant). Otherwise it's Vercel-native - no other config.
 
 ---
 
@@ -206,4 +220,4 @@ Set `DATABASE_URL` to a pooled Neon / Vercel Postgres string, plus `BETTER_AUTH_
 - *Agent orchestrates, deterministic code does the heavy lifting* - model sees headers + sample + aggregates, never 10k rows.
 - *Detect-then-ask* imports vs. assume-products - richer product feel, exposes the multi-target framework.
 
-**What I'd do next** - queue-backed >10k imports and a scheduler to fire the existing **Automations** on a cron/webhook (manual runs work today; the runner is already trigger-agnostic); an **eval harness for mapping accuracy** (mapping quality is the product); more targets, full API parity, RBAC, and a real Distru/MCP adapter behind the same service layer.
+**What I'd do next** - swap the in-process workflow executor for a **durable runtime** (Inngest/Temporal) behind the `WorkflowRuntime` seam for retries and long waits, and wire the live entry points for the `webhook`/`event` trigger nodes (cron `schedule` firing already works); queue-backed >10k imports; an **eval harness for mapping accuracy** (mapping quality is the product); more targets, full API parity, RBAC, and a real Distru/MCP adapter behind the same service layer.

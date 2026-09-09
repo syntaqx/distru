@@ -18,17 +18,9 @@ import type { HarnessEvent, Interrupt, ToolDecision } from "@/lib/harness/types"
 import { BlockView, ThinkingDots, type ChatBlock } from "./blocks";
 import { GateCard } from "./gate-cards";
 import { Composer } from "./composer";
+import { timeAgo } from "@/lib/format";
 
 type ConversationLite = { id: string; title: string; updatedAt?: string };
-
-function timeAgo(iso?: string) {
-  if (!iso) return "";
-  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (s < 60) return "just now";
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  return `${Math.floor(s / 86400)}d ago`;
-}
 
 const SUGGESTIONS = [
   "What are my top categories and how much stock do I have?",
@@ -41,7 +33,7 @@ function pageLabel(p: string): string | null {
   if (p.startsWith("/inventory")) return "Inventory";
   if (p.startsWith("/companies")) return "Companies";
   if (p.startsWith("/dashboard")) return "Dashboard";
-  if (p.startsWith("/integrations")) return "Integrations";
+  if (p.startsWith("/settings/integrations")) return "Integrations";
   return null;
 }
 
@@ -173,6 +165,9 @@ export function ChatView({
         setStreaming(false);
         void refreshConversations();
         router.refresh(); // keep the page behind the dock in sync with agent changes
+        // Let live client surfaces (e.g. the Automations list) re-fetch after a
+        // Copilot turn, so a workflow the agent just created appears immediately.
+        window.dispatchEvent(new CustomEvent("distru:copilot:done"));
         break;
     }
   }

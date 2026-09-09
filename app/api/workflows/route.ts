@@ -5,6 +5,8 @@ import {
   listRuns,
   listWorkflows,
 } from "@/lib/harness/workflows";
+import { emptyGraph } from "@/lib/harness/graph/validate";
+import type { WorkflowGraph } from "@/lib/harness/graph/types";
 
 export async function GET() {
   const ctx = await getOrgContext();
@@ -28,18 +30,19 @@ export async function POST(req: Request) {
     instruction?: string;
     trigger?: "manual" | "schedule";
     schedule?: string | null;
+    graph?: WorkflowGraph | null;
   };
-  if (!body.name || !body.instruction) {
-    return NextResponse.json(
-      { error: "name and instruction are required" },
-      { status: 400 },
-    );
+  if (!body.name) {
+    return NextResponse.json({ error: "name is required" }, { status: 400 });
   }
+  // A workflow needs a body: either a saved graph or a legacy instruction.
+  const graph = body.graph ?? emptyGraph();
   const workflow = await createWorkflow(ctx, {
     name: body.name,
-    instruction: body.instruction,
+    instruction: body.instruction ?? "",
     trigger: body.trigger,
     schedule: body.schedule,
+    graph,
     createdBy: ctx.userId,
   });
   return NextResponse.json({ workflow });

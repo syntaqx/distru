@@ -44,6 +44,7 @@
 | **CSV import** — bulk upload with error report | detect→map→validate→**partial commit**→row-mapped error CSV; 7 targets; images + on-hand | ● Strong / exceeds |
 | **Public API + webhooks** | 136 documented routes, HMAC webhooks, field-accurate conventions | ● Strong / exceeds route count |
 | **AI** — "AI Order Agent" (messages/voice/files → orders) | **Agentic Copilot**: 55 HITL-gated tools across *every* domain, resumable, MCP-exposed, provider-agnostic | ● Exceeds in scope |
+| **Workflow automation** — scheduled/emailable reports + some Metrc automation; no general workflow builder | **Visual n8n-style workflow engine**: triggers + **AI-agent nodes** (tools attached as sub-nodes) + action/if/set nodes on a React Flow canvas, AI graph-authoring from a prompt, real cron firing | ● Exceeds (not a Distru feature) |
 | **Calendar & Tasks** | `tasks` table + API; no calendar UI | ◐ Data only |
 | **Label printing / DistruLabels** | (none) | ○ Gap |
 | **Integration ecosystem** — QB, Xero, Sage, LeafLink, Dutchie, Blaze, Treez, Onfleet, Apex, Trym | Mock seams for Metrc/QuickBooks/LeafLink/BioTrack | ◐ 4 mocked; the rest absent |

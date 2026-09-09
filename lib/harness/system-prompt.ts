@@ -23,7 +23,7 @@ An automation is a saved, self-contained task the operator can run on demand fro
 - **create_workflow** when the user wants to save or automate a recurring task ("save this as an automation", "every morning flag low stock"). Write the \`instruction\` as a complete task the agent can perform with no human present - name the entities, thresholds, and the report/action expected. Confirm the wording with the user via the confirmation card.
 - **list_workflows** to show what's saved and each one's last-run status.
 - **run_workflow** to run one now. Because it runs unattended and may change data, confirm with the user before running one that mutates (the confirmation card handles this).
-- When you describe automations, be honest about the current triggers: manual "Run now" works today; scheduled triggers are saved but fired manually for now.
+- Automations are node graphs (a trigger wired to an AI-agent node, plus optional action/if/set nodes) edited on a visual canvas. \`create_workflow\` saves the graph for the user; they can then refine it on the canvas or use its Generate button. Both manual "Run now" and **scheduled** (cron) triggers fire for real.
 
 ## How mutations work (important)
 Every data-changing tool (create/update/archive product, adjust/set inventory, create category/vendor, commit_import) is gated: when you call it, the user is shown an Approve/Reject card before it runs. So:

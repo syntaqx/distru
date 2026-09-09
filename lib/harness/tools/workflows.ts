@@ -1,12 +1,41 @@
 import { z } from "zod";
 import { defineTool } from "../tool";
 import type { HarnessToolPreview } from "../types";
+import type { WorkflowGraph } from "@/lib/harness/graph/types";
 import {
   createWorkflow,
   getWorkflow,
   listWorkflows,
   runWorkflow,
 } from "@/lib/harness/workflows";
+
+/** Build a minimal graph (trigger -> agent) from a saved instruction. */
+function instructionGraph(
+  instruction: string,
+  trigger: "manual" | "schedule",
+  cron?: string,
+  description?: string,
+): WorkflowGraph {
+  return {
+    nodes: [
+      {
+        id: "trigger",
+        type: trigger === "schedule" ? "trigger.schedule" : "trigger.manual",
+        name: trigger === "schedule" ? "Schedule" : "Manual trigger",
+        params: trigger === "schedule" ? { cron: cron ?? "", description: description ?? "" } : {},
+        position: { x: 80, y: 160 },
+      },
+      {
+        id: "agent",
+        type: "agent",
+        name: "Agent",
+        params: { instruction, maxSteps: 12 },
+        position: { x: 360, y: 160 },
+      },
+    ],
+    connections: { trigger: { main: [[{ node: "agent" }]] } },
+  };
+}
 
 function confirm(
   title: string,
@@ -48,11 +77,12 @@ export const listWorkflowsTool = defineTool({
 export const createWorkflowTool = defineTool({
   name: "create_workflow",
   description:
-    "Save a reusable automated workflow: a named instruction the Copilot can run " +
-    "on demand (or, when scheduled, unattended). Use this when the user wants to " +
-    "automate a recurring task (e.g. 'every morning, flag SKUs under 10 units'). " +
-    "The instruction should be a complete, self-contained task written for the " +
-    "agent to execute without a human present.",
+    "Save a reusable automated workflow as an editable node graph (a trigger wired " +
+    "to an AI-agent node that runs the instruction). Runs on demand, or unattended " +
+    "when scheduled. Use this when the user wants to automate a recurring task (e.g. " +
+    "'every morning, flag SKUs under 10 units'). The instruction should be a complete, " +
+    "self-contained task written for the agent to execute without a human present. The " +
+    "user can then refine the graph - add tools, conditions, more steps - on the canvas.",
   gate: "confirmation",
   inputSchema: z.object({
     name: z.string().describe("Short human name, e.g. 'Low-stock report'"),
@@ -66,6 +96,10 @@ export const createWorkflowTool = defineTool({
       .string()
       .optional()
       .describe("Human schedule when trigger=schedule, e.g. 'daily at 8am'"),
+    cron: z
+      .string()
+      .optional()
+      .describe("Standard 5-field cron (UTC) when trigger=schedule, e.g. '0 8 * * *'. Enables real auto-firing."),
   }),
   buildPreview(input) {
     return confirm(
@@ -81,16 +115,16 @@ export const createWorkflowTool = defineTool({
     );
   },
   async execute(input, ctx) {
+    const trigger = input.trigger ?? "manual";
     const wf = await createWorkflow(ctx.service, {
       name: input.name,
       instruction: input.instruction,
-      trigger: input.trigger ?? "manual",
-      schedule: input.schedule ?? null,
+      graph: instructionGraph(input.instruction, trigger, input.cron, input.schedule),
       createdBy: ctx.userId,
     });
     return {
       ok: true,
-      summary: `Saved workflow "${wf.name}". Run it any time from the Automations page or with run_workflow.`,
+      summary: `Saved workflow "${wf.name}" as an editable node graph. Run it any time from the Automations page or with run_workflow.`,
       data: { id: wf.id, name: wf.name },
     };
   },

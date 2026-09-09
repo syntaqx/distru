@@ -12,3 +12,11 @@ export {
   type MarketplaceProvider,
   type TraceabilityProvider,
 } from "./sync";
+export {
+  getEmailProvider,
+  getDriveProvider,
+  type EmailProvider,
+  type DriveProvider,
+  type EmailResult,
+  type DriveResult,
+} from "./delivery";

@@ -27,6 +27,8 @@ export type ModelTurnRequest = {
   messages: Anthropic.MessageParam[];
   tools: ModelToolSpec[];
   maxTokens?: number;
+  /** Optional per-turn model override (e.g. an agent node pinning its model). */
+  model?: string;
 };
 
 /** A parsed tool call the model wants to make. */

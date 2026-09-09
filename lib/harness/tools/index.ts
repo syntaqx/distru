@@ -10,6 +10,7 @@ import { cultivationTools } from "./cultivation";
 import { purchasingTools } from "./purchasing";
 import { manufacturingTools } from "./manufacturing";
 import { complianceTools } from "./compliance";
+import { reportTools } from "./reports";
 import { askUser } from "./ask";
 
 let registered = false;
@@ -29,6 +30,7 @@ export function ensureToolsRegistered() {
     ...purchasingTools,
     ...manufacturingTools,
     ...complianceTools,
+    ...reportTools,
     askUser,
   ]);
   registered = true;

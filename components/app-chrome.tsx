@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { Sidebar } from "@/components/sidebar";
 import { TopBar } from "@/components/topbar";
 import { OrgSwitcher } from "@/components/org-switcher";
 import { CopilotPanel } from "@/components/chat/copilot-panel";
 import { ThemeProvider } from "@/components/theme";
+import { TopProgress } from "@/components/top-progress";
 
 const STORAGE_KEY = "distru:copilot:open";
 
@@ -62,6 +63,9 @@ export function AppChrome({
 
   return (
     <ThemeProvider>
+      <Suspense fallback={null}>
+        <TopProgress />
+      </Suspense>
       <div className="flex h-dvh flex-col overflow-hidden">
         <div className="flex h-14 shrink-0 border-b" style={{ background: "var(--color-surface)" }}>
           <div className="flex w-64 shrink-0 items-center border-r px-2">

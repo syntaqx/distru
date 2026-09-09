@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Search } from "lucide-react";
+import { timeAgo } from "@/lib/format";
 
 export type AuditEntry = {
   id: string;
@@ -45,15 +46,6 @@ function actionLabel(action: string) {
     return `${v} ${entity.replace(/_/g, " ")}`;
   }
   return action;
-}
-
-function timeAgo(iso: string) {
-  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (s < 60) return "just now";
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  if (s < 2592000) return `${Math.floor(s / 86400)}d ago`;
-  return `${Math.floor(s / 2592000)}mo ago`;
 }
 
 function shortId(id: string | null) {

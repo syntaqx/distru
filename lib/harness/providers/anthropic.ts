@@ -30,7 +30,7 @@ export const anthropicProvider: ModelProvider = {
     emit: (event: HarnessEvent) => void,
   ): Promise<ModelTurn> {
     const stream = anthropic.messages.stream({
-      model: MODEL,
+      model: req.model || MODEL,
       max_tokens: req.maxTokens ?? 16000,
       system: [{ type: "text", text: req.system, cache_control: { type: "ephemeral" } }],
       thinking: { type: "adaptive", display: "summarized" },

@@ -1,13 +1,14 @@
 import {
   BarChart3,
   DollarSign,
-  ExternalLink,
   Package,
   ShoppingCart,
   TrendingUp,
   Users,
 } from "lucide-react";
 import { getOrgContext } from "@/lib/session";
+import { listReportDefs } from "@/lib/modules/reports";
+import { ReportRow } from "@/components/insights/report-row";
 import {
   salesSummary,
   topProducts,
@@ -39,55 +40,22 @@ const PERIOD_LABEL: Record<Period, string> = {
 };
 
 /**
- * The Reports API surface, mirrored into the UI. Each entry opens the same JSON
- * an API client would receive from `/public/v1/reports/<name>`.
+ * The Available-reports list is derived from the report registry (the single
+ * source of truth that also powers the `/public/v1/reports/*` API and the
+ * `generate_report` tool), grouped in registry order.
  */
-const REPORTS: { group: string; items: { name: string; label: string }[] }[] = [
-  {
-    group: "Sales",
-    items: [
-      { name: "sales-by-company", label: "Sales by company" },
-      { name: "sales-by-product", label: "Sales by product" },
-      { name: "sales-by-user", label: "Sales by user" },
-      { name: "sales-order-history", label: "Sales order history" },
-      { name: "sales-order-item-history", label: "Sales order item history" },
-      { name: "sales-order-tax", label: "Sales order tax" },
-      { name: "order-fulfillment", label: "Order fulfillment" },
-      { name: "invoice-history", label: "Invoice history" },
-    ],
-  },
-  {
-    group: "Inventory & COGS",
-    items: [
-      { name: "cogs", label: "Cost of goods sold" },
-      { name: "inventory-valuation", label: "Inventory valuation" },
-      { name: "inventory-assets", label: "Inventory assets" },
-      {
-        name: "inventory-transaction-history",
-        label: "Inventory transaction history",
-      },
-    ],
-  },
-  {
-    group: "Purchasing",
-    items: [
-      { name: "purchase-order-history", label: "Purchase order history" },
-      { name: "purchases-by-company", label: "Purchases by company" },
-      { name: "purchases-by-product", label: "Purchases by product" },
-    ],
-  },
-  {
-    group: "Cultivation",
-    items: [
-      {
-        name: "cultivation-transaction-history",
-        label: "Cultivation transaction history",
-      },
-      { name: "harvest-outputs", label: "Harvest outputs" },
-      { name: "plant-lifecycle", label: "Plant lifecycle" },
-    ],
-  },
-];
+const REPORTS: { group: string; items: { name: string; label: string }[] }[] = (() => {
+  const groups: { group: string; items: { name: string; label: string }[] }[] = [];
+  for (const def of listReportDefs()) {
+    let g = groups.find((x) => x.group === def.group);
+    if (!g) {
+      g = { group: def.group, items: [] };
+      groups.push(g);
+    }
+    g.items.push({ name: def.name, label: def.label });
+  }
+  return groups;
+})();
 
 function Stat({
   label,
@@ -383,8 +351,9 @@ export default async function InsightsPage({
           </div>
           <p className="mb-4 text-xs text-muted">
             These are the same reports available over the API at{" "}
-            <code className="font-mono">/public/v1/reports/*</code>. Each link
-            opens the report&apos;s live JSON in a new tab.
+            <code className="font-mono">/public/v1/reports/*</code>. Open the live
+            JSON, or <span className="font-medium">save a snapshot to Reports</span> (hover a row) to
+            keep, download, or have an automation email it.
           </p>
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {REPORTS.map((group) => (
@@ -394,20 +363,7 @@ export default async function InsightsPage({
                 </div>
                 <ul className="space-y-1">
                   {group.items.map((r) => (
-                    <li key={r.name}>
-                      <a
-                        href={`/public/v1/reports/${r.name}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="group flex items-center gap-1.5 text-sm text-info hover:underline"
-                      >
-                        <span className="truncate">{r.label}</span>
-                        <ExternalLink
-                          size={12}
-                          className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
-                        />
-                      </a>
-                    </li>
+                    <ReportRow key={r.name} name={r.name} label={r.label} />
                   ))}
                 </ul>
               </div>

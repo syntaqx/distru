@@ -127,43 +127,45 @@ export function Sidebar({
                 );
               };
               const all = listDocs();
-              // Product docs render as one flat list; everything else (the
-              // engineering/architecture tier) groups by section so the
-              // two-piece showcase - Platform vs Copilot - reads in the nav.
-              const PRODUCT_SECTIONS = [
-                "Getting started",
-                "Catalog",
-                "Selling",
-                "Importing data",
-                "Copilot",
-                "Developers",
-              ];
-              const product = all.filter((d) =>
-                PRODUCT_SECTIONS.includes(d.section),
+              // Two tiers, clearly divided: the PRODUCT docs (what you'd write
+              // for a real product) render as one flat list on top, and the
+              // ENGINEERING / take-home write-ups (how it's built + the "above
+              // and beyond the ask" story) sit in a labelled block at the bottom.
+              const ENGINEERING_SECTIONS = ["Platform architecture", "Copilot & take-home"];
+              const isEng = (s: string) => ENGINEERING_SECTIONS.includes(s);
+              const product = all.filter((d) => !isEng(d.section));
+              const engineering = all.filter((d) => isEng(d.section));
+              const engSections = ENGINEERING_SECTIONS.filter((s) =>
+                engineering.some((d) => d.section === s),
               );
-              const engineering = all.filter(
-                (d) => !PRODUCT_SECTIONS.includes(d.section),
-              );
-              const engSections: string[] = [];
-              for (const d of engineering)
-                if (!engSections.includes(d.section))
-                  engSections.push(d.section);
               return (
                 <div className="space-y-5">
                   <div className="space-y-0.5">
                     <BackHeader label="Docs" />
                     {product.map(docLink)}
                   </div>
-                  {engSections.map((section) => (
-                    <div key={section} className="space-y-0.5">
-                      <div className="px-3 pb-1 text-[11px] font-medium uppercase tracking-wide text-muted">
-                        {section}
+                  {engineering.length > 0 && (
+                    <div className="space-y-3 border-t pt-4">
+                      <div className="px-3">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-fg">
+                          Architecture &amp; take-home
+                        </div>
+                        <div className="mt-0.5 text-[11px] leading-snug text-muted">
+                          How it&apos;s built, and the take-home write-up - above and beyond the ask.
+                        </div>
                       </div>
-                      {engineering
-                        .filter((d) => d.section === section)
-                        .map(docLink)}
+                      {engSections.map((section) => (
+                        <div key={section} className="space-y-0.5">
+                          <div className="px-3 pb-1 text-[11px] font-medium uppercase tracking-wide text-muted">
+                            {section}
+                          </div>
+                          {engineering
+                            .filter((d) => d.section === section)
+                            .map(docLink)}
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
                 </div>
               );
             })()}
@@ -172,9 +174,12 @@ export function Sidebar({
             <>
               {MAIN.map((group) => (
                 <div key={group.label} className="space-y-0.5">
-                  <div className="px-3 pb-1 text-[11px] font-medium uppercase tracking-wide text-muted">
-                    {group.label}
-                  </div>
+                  {/* "Overview" is a single top-level item (Dashboard); it needs no header. */}
+                  {group.label !== "Overview" && (
+                    <div className="px-3 pb-1 text-[11px] font-medium uppercase tracking-wide text-muted">
+                      {group.label}
+                    </div>
+                  )}
                   {group.items.map((item) => (
                     <Row
                       key={item.label}

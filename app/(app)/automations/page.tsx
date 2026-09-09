@@ -13,9 +13,9 @@ export default async function AutomationsPage() {
     workflows.map(async (w) => ({
       id: w.id,
       name: w.name,
-      instruction: w.instruction,
       trigger: w.trigger,
       schedule: w.schedule,
+      graph: w.graph,
       lastRunAt: w.lastRunAt ? w.lastRunAt.toISOString() : null,
       lastRunStatus: w.lastRunStatus,
       recentRuns: (await listRuns(service, w.id, 25)).map((r) => ({
@@ -23,6 +23,8 @@ export default async function AutomationsPage() {
         status: r.status,
         summary: r.summary,
         conversationId: r.conversationId,
+        trigger: r.trigger,
+        nodeRuns: r.nodeRuns,
         createdAt: r.createdAt.toISOString(),
         finishedAt: r.finishedAt ? r.finishedAt.toISOString() : null,
       })),
@@ -34,7 +36,8 @@ export default async function AutomationsPage() {
       <header className="border-b px-6 py-4">
         <h1 className="text-lg font-semibold">Automations</h1>
         <p className="text-sm text-muted">
-          Saved tasks the Copilot runs unattended. Create one, run it on demand, and review exactly what each run did.
+          Build workflows as a node graph - triggers, AI agents with their own tools, conditions, and
+          deterministic actions. Run on demand or on a schedule, and review exactly what each run did.
         </p>
       </header>
       <div className="min-h-0 flex-1">

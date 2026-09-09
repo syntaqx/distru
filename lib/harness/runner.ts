@@ -18,6 +18,18 @@ import type { ToolResult } from "./tool";
 
 const MAX_STEPS = 16;
 
+/**
+ * Per-turn options. `toolNames` scopes the advertised tool set to a subset of the
+ * registry - this is how an `agent` graph node runs with only its attached tools.
+ * `model`/`maxSteps` let a node pin its model and step budget.
+ */
+export type RunOptions = {
+  autoApprove?: boolean;
+  toolNames?: string[];
+  model?: string;
+  maxSteps?: number;
+};
+
 function toolResultBlock(
   toolUseId: string,
   res: ToolResult,
@@ -45,17 +57,23 @@ async function systemPrompt(ctx: AgentContext) {
 async function runLoop(
   ctx: AgentContext,
   messages: Anthropic.MessageParam[],
-  autoApprove = false,
+  opts: RunOptions = {},
 ) {
+  const { autoApprove = false, toolNames, model } = opts;
   const system = await systemPrompt(ctx);
 
   const provider = getModelProvider();
 
-  for (let step = 0; step < MAX_STEPS; step++) {
+  // Scope the advertised tools to a node's attached set, when given.
+  const allowed = toolNames && toolNames.length ? new Set(toolNames) : null;
+  const specs = allowed ? toolSpecs().filter((s) => allowed.has(s.name)) : toolSpecs();
+  const maxSteps = opts.maxSteps ?? MAX_STEPS;
+
+  for (let step = 0; step < maxSteps; step++) {
     let turn: Awaited<ReturnType<typeof provider.streamTurn>>;
     try {
       turn = await provider.streamTurn(
-        { system, messages, tools: toolSpecs() },
+        { system, messages, tools: specs, model },
         (event) => ctx.emit(event),
       );
     } catch (err) {
@@ -84,6 +102,24 @@ async function runLoop(
       const tool = getTool(tu.name);
       if (!tool) {
         const res: ToolResult = { ok: false, summary: `Unknown tool ${tu.name}.` };
+        await recordToolCall(ctx.service, {
+          conversationId: ctx.conversationId,
+          toolUseId: tu.id,
+          name: tu.name,
+          inputJson: tu.input as Record<string, unknown>,
+          status: "error",
+          requiresConfirmation: false,
+          output: res,
+        });
+        results.push(toolResultBlock(tu.id, res));
+        continue;
+      }
+
+      if (allowed && !allowed.has(tu.name)) {
+        const res: ToolResult = {
+          ok: false,
+          summary: `Tool ${tu.name} is not attached to this workflow node.`,
+        };
         await recordToolCall(ctx.service, {
           conversationId: ctx.conversationId,
           toolUseId: tu.id,
@@ -198,13 +234,10 @@ async function runLoop(
 }
 
 /** Entry point for a fresh user message (already persisted by the caller). */
-export async function runConversationTurn(
-  ctx: AgentContext,
-  opts?: { autoApprove?: boolean },
-) {
+export async function runConversationTurn(ctx: AgentContext, opts?: RunOptions) {
   ensureToolsRegistered();
   const rows = await loadMessages(ctx.service, ctx.conversationId);
-  await runLoop(ctx, toMessageParams(rows), opts?.autoApprove ?? false);
+  await runLoop(ctx, toMessageParams(rows), opts ?? {});
 }
 
 /**

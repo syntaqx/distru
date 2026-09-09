@@ -1,6 +1,7 @@
-import { index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { index, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { organization, user } from "./auth";
 import { pk, timestamps } from "./_shared";
+import type { NodeRun, WorkflowGraph } from "@/lib/harness/graph/types";
 
 /**
  * Automated workflows: a saved instruction the agent runs on a trigger. The same
@@ -19,6 +20,13 @@ export const workflows = pgTable(
     trigger: text().notNull().default("manual"), // manual | schedule
     schedule: text(), // human cron-ish description when trigger = schedule
     status: text().notNull().default("active"),
+    /**
+     * The n8n-shaped node graph. When present, the graph executor runs it; when
+     * null, `instruction` is run as an implicit single-agent graph (legacy rows).
+     */
+    graph: jsonb().$type<WorkflowGraph | null>(),
+    /** When this schedule is next due to fire (set for trigger = schedule). */
+    nextRunAt: timestamp({ withTimezone: true }),
     createdBy: uuid().references(() => user.id, { onDelete: "set null" }),
     lastRunAt: timestamp({ withTimezone: true }),
     lastRunStatus: text(),
@@ -40,6 +48,10 @@ export const workflowRuns = pgTable(
     status: text().notNull().default("running"), // running | success | error
     summary: text(),
     conversationId: uuid(),
+    /** Per-node execution record for graph runs (null for legacy single-agent runs). */
+    nodeRuns: jsonb().$type<NodeRun[] | null>(),
+    /** What kicked off the run: manual | schedule | webhook | event. */
+    trigger: text(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     finishedAt: timestamp({ withTimezone: true }),
   },

@@ -15,6 +15,7 @@ import {
   Zap,
 } from "lucide-react";
 import { getOrgContext } from "@/lib/session";
+import { timeAgo } from "@/lib/format";
 import { listProducts } from "@/lib/modules/catalog";
 import { onHandByProduct } from "@/lib/modules/inventory";
 import { listCompanies } from "@/lib/modules/catalog";
@@ -55,7 +56,7 @@ const ACTIVE = [
     Icon: Workflow,
   },
   {
-    href: "/integrations",
+    href: "/settings/integrations",
     label: "Integrations",
     desc: "Connect the tools you use",
     Icon: Zap,
@@ -63,12 +64,9 @@ const ACTIVE = [
   { href: "/purchasing", label: "Purchasing", desc: "POs & vendor intake", Icon: Truck },
   { href: "/manufacturing", label: "Manufacturing", desc: "Assemblies, BOMs & COGS", Icon: Factory },
   { href: "/compliance", label: "Compliance", desc: "Licenses, COAs & Metrc", Icon: ShieldCheck },
+  { href: "/cultivation", label: "Cultivation", desc: "Plants, harvests & lifecycle", Icon: Sprout },
   { href: "/fleet", label: "Fleet", desc: "Drivers & vehicles", Icon: Car },
   { href: "/insights", label: "Insights", desc: "Reporting & analytics", Icon: LineChart },
-];
-
-const PREVIEW = [
-  { label: "Cultivation", desc: "Plants, harvests & lifecycle", Icon: Sprout },
 ];
 
 function actionLabel(action: string) {
@@ -87,14 +85,6 @@ function actionLabel(action: string) {
     "api_token.revoke": "Revoked API token",
   };
   return map[action] ?? action;
-}
-
-function timeAgo(d: Date) {
-  const s = Math.floor((Date.now() - d.getTime()) / 1000);
-  if (s < 60) return "just now";
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  return `${Math.floor(s / 86400)}d ago`;
 }
 
 function Stat({ label, value }: { label: string; value: string | number }) {
@@ -154,27 +144,6 @@ export default async function DashboardPage() {
             </Link>
           ))}
         </div>
-
-        <h2 className="mb-3 text-sm font-semibold text-muted">
-          On the roadmap
-        </h2>
-        <div className="mb-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          {PREVIEW.map(({ label, desc, Icon }) => (
-            <div key={label} className="card opacity-75">
-              <div className="flex items-center justify-between">
-                <Icon size={18} className="text-muted" />
-                <span className="badge text-[10px]">Preview</span>
-              </div>
-              <div className="mt-3 text-sm font-medium">{label}</div>
-              <div className="text-xs text-muted">{desc}</div>
-            </div>
-          ))}
-        </div>
-        <p className="mb-8 -mt-4 text-xs text-muted">
-          Preview modules aren&apos;t built out - but the same agentic harness,
-          service layer, and public API/MCP that power Inventory are designed to
-          power all of them next.
-        </p>
 
         <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-muted">
           <Activity size={15} /> Recent activity
