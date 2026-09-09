@@ -198,26 +198,58 @@ The Copilot is a Distru assistant. It helps with your workspace and how to use D
     slug: "automations",
     section: "Copilot",
     title: "Automations",
-    summary: "Save a task once and let the Copilot run it unattended.",
-    keywords: ["automation", "automations", "workflow", "workflows", "schedule", "scheduled", "run now", "unattended", "recurring", "job"],
+    summary: "Build workflows as a node graph - AI agents, triggers, and actions that produce and deliver real reports, on a schedule.",
+    keywords: ["automation", "automations", "workflow", "workflows", "node graph", "canvas", "agent", "schedule", "scheduled", "cron", "trigger", "webhook", "run now", "unattended", "recurring", "job", "report", "email", "drive"],
     body: `# Automations
 
-An **automation** is a saved instruction the Copilot runs on its own. It uses the same tools as the chat Copilot, so anything you can ask for in chat can become a repeatable, one-click job - a low-stock report, a recurring price sync, catalog cleanup.
+An **automation** is a workflow you build as a **node graph** - triggers, AI agents, conditions, and deterministic actions wired together. It follows the n8n model, but an **AI agent is a first-class node**: describe a task in plain language and it plans and calls the tools you give it, right alongside ordinary no-LLM steps.
 
-## How it runs
-A normal chat asks you to approve each change. An automation runs **unattended**: because nobody is at the keyboard, its actions execute automatically. Every action is still written to the audit log, attributed to the automation rather than a person, so you can see exactly what it did.
+## The building blocks
+- **Triggers** start a run: **Manual** (Run now), **Schedule** (a cron - fires for real), **Webhook**, or **On event**.
+- **AI Agent** - an unattended Copilot turn scoped to exactly the **Tool** sub-nodes you wire into it. Give it \`inventory_report\` + \`save_report\` and it builds and saves the report.
+- **Action** - runs a single tool with fixed inputs, no LLM. A deterministic step.
+- **If** - branches the flow (a true path and a false path).
+- **Set** - writes values that later steps read via \`{{ nodes.<id>.summary }}\`.
 
-## Create one
-Two ways: click **New automation** on the Automations page and fill in a name and instruction, or ask the Copilot *"Save an automation that flags every SKU under 10 units"* and approve the card. Either way, write the instruction so it stands on its own - name the thresholds, the products, and what you want back - since it runs with no one watching.
+## Build one
+Open **Automations** and either:
+- **Draw it on the canvas** - drag nodes from the palette, wire a Tool sub-node into an agent's tool port, and edit each node in the side panel.
+- **Generate it** - click **Generate** and describe the automation (*"every weekday at 8am, list products under 25 units and email me the report"*); the AI drafts the whole graph for you to edit.
+- **Ask the Copilot** - *"Save an automation that flags every SKU under 10 units each morning"* and approve the card.
+
+Prefer JSON? Toggle **Visual / JSON** to edit the graph document directly - copy it to hand an automation to someone, or paste one in to import it.
 
 ## Run and review
-Open **Automations** from the sidebar. Each automation has a **Run now** button, its full **run history**, and a per-run view of exactly what the Copilot did (every tool call and the final summary). You can also just say *"run the low-stock automation"* in the Copilot.
+**Run** executes the graph and lights up each node's status live. Open **History** for every run, its per-step breakdown, and each agent step's full transcript (the tool calls plus the rendered report). **Scheduled** triggers fire on their cron automatically.
 
-## Triggers
-- **Manual** - run it yourself with **Run now**. Available today.
-- **Scheduled** - a schedule (such as "daily at 8am") can be saved on an automation and is shown alongside it. The same engine runs it; automatically firing on the schedule is the next step.
+## Real outcomes: produce, deliver, notify
+Automations don't just print text - they do real work:
+- **save_report** persists the output as a durable **[Report](/docs/reports)** you can view and download.
+- **email_report** / **upload_to_drive** deliver that report to an inbox or Google Drive (through the [integrations](/docs/integrations) seam).
+- Every completed run drops a **notification** on the topbar bell and the **Notifications** inbox, linking straight to its results.
 
-Because automations can change data without asking each time, review what one does before scheduling it to run repeatedly.`,
+## Unattended + audited
+A chat asks you to approve each change; an automation runs **unattended** and auto-approves its own actions - so write instructions that stand on their own (name the thresholds, the products, and what you want back). Every action is still written to the audit log, attributed to the automation. Review what one does before scheduling it to run repeatedly.`,
+  },
+  {
+    slug: "reports",
+    section: "Copilot",
+    title: "Reports & delivery",
+    summary: "Durable report artifacts the Copilot and automations produce - view, download, email, or upload to Drive.",
+    keywords: ["report", "reports", "artifact", "save report", "generate report", "csv", "markdown", "download", "email", "google drive", "deliver", "delivery", "notification", "snapshot"],
+    body: `# Reports & delivery
+
+A **Report** is a durable artifact - a saved snapshot of output (Markdown, CSV, or JSON) - that lives in the **Reports** section, separate from the live [Insights](/docs/insights) dashboard.
+
+## Where reports come from
+- An **[automation](/docs/automations)** or the **Copilot** calls \`save_report\` to persist its output, or \`generate_report\` to snapshot one of the standard Insights reports.
+- The **Insights** page's **Save to Reports** action snapshots any of the 18 standard reports on demand.
+
+## View, download, deliver
+Open **Reports** to read a report (Markdown renders as a formatted table), download it, or see where it's been delivered. An automation can **email** a report or **upload it to Google Drive** with \`email_report\` / \`upload_to_drive\` - these run through the [integrations](/docs/integrations) seam, so they cleanly report "not connected" until you wire up an email or Drive provider.
+
+## Notifications
+When a report is ready or a workflow finishes, a **notification** appears on the topbar bell and in the **Notifications** inbox (in the nav under Dashboard), each linking straight to the result.`,
   },
   {
     slug: "api-and-integrations",
@@ -614,7 +646,7 @@ export const inventoryLedger = pgTable("inventory_ledger", {
 | purchasing | \`purchase_orders\`, \`purchase_order_items\` | buying from a vendor; receiving a PO posts an inventory increment - the mirror of a sales decrement |
 | imports | \`import_files\`, \`import_jobs\`, \`import_rows\` | the 10k rows live in \`import_rows\`, never in the model |
 | platform | \`api_tokens\`, \`webhook_endpoints\`, \`webhook_deliveries\`, \`audit_log\` | tokens SHA-256 hashed; every mutation from every face is audited |
-| Copilot (Piece 2) | \`conversations\`, \`messages\`, \`tool_calls\`, \`workflows\`, \`workflow_runs\` | messages store raw Anthropic content blocks; tool_calls doubles as the agent audit trail; workflows are saved automations |`,
+| Copilot (Piece 2) | \`conversations\`, \`messages\`, \`tool_calls\`, \`workflows\`, \`workflow_runs\`, \`artifacts\`, \`notifications\` | messages store raw Anthropic content blocks; tool_calls doubles as the agent audit trail; workflows hold the node graph, workflow_runs the per-node results; artifacts are durable Reports, notifications feed the bell |`,
   },
   {
     slug: "take-home",
@@ -987,9 +1019,9 @@ Rows are persisted and processed in chunks; validate and commit are O(rows) with
 
 ## MVP vs deferred
 
-**Built and running:** multitenant auth and org-scoped services with an audit log; the harness (streaming loop, provider-agnostic model seam, HITL confirm and ask_user, resumable) with ~40 tools that operate every domain; import end to end with seven targets, detect to error CSV, 10k rows; five faces on one service layer; a public REST API + MCP spanning 136 self-documented routes with a build-time OpenAPI drift guard; API-accurate mock providers (Metrc/QuickBooks/LeafLink) behind a real seam; Automations with run history and per-run transcripts; and a **routed operator screen for every domain** - dashboard, insights, inventory (+ packages/batches/bins), categories, companies, sales (+ returns/credits/payments), purchasing, manufacturing, compliance, cultivation, fleet, automations, reference data, settings, integrations, docs.
+**Built and running:** multitenant auth and org-scoped services with an audit log; the harness (streaming loop, provider-agnostic model seam, HITL confirm and ask_user, resumable) with ~60 tools that operate every domain; import end to end with seven targets, detect to error CSV, 10k rows; five faces on one service layer; a public REST API + MCP spanning 136 self-documented routes with a build-time OpenAPI drift guard; API-accurate mock providers (Metrc/QuickBooks/LeafLink) behind a real seam; a **visual workflow engine** (node-graph automations with AI-agent nodes, real cron scheduling, and a produce → deliver → notify loop: Reports, email/Drive delivery, and notifications); and a **routed operator screen for every domain** - dashboard, insights, reports, notifications, inventory (+ packages/batches/bins), categories, companies, sales (+ returns/credits/payments), purchasing, manufacturing, compliance, cultivation, fleet, automations, reference data, settings, integrations, docs.
 
-**Deferred, seams in place:** queue-backed imports beyond 10k and a scheduler firing crons/webhooks into the same headless run path; MCP-client ingestion of a customer's connected servers; **live** external sync behind the mock provider seams (real Metrc/QuickBooks/LeafLink adapters); the Billing/Notifications screens (no backend); an eval harness for column-mapping accuracy; RBAC beyond org membership.
+**Deferred, seams in place:** queue-backed imports beyond 10k; a durable workflow runtime (Inngest/Temporal) behind the in-process executor, plus live entry points for the webhook/event trigger nodes (cron scheduling already fires); MCP-client ingestion of a customer's connected servers; **live** external sync behind the mock provider seams (real Metrc/QuickBooks/LeafLink adapters, and live email/Drive delivery); the Billing screen (no backend); an eval harness for column-mapping accuracy; RBAC beyond org membership.
 
 ## Build it from scratch
 
@@ -1002,7 +1034,7 @@ If there were no demo, this is the order to rebuild it. Each step depends only o
 5. **Tools** - catalog reads (gate none), mutations (gate confirmation with a preview), the import tools, docs tools, and workflow tools.
 6. **Import framework** - the ImportTarget seam, the detection classifier, the mapping matcher, the chunked pipeline, the error-CSV builder, and the seven targets.
 7. **Faces** - chat NDJSON routes and \`/resume\`; \`/public/v1/*\` with Distru conventions; the \`/api/mcp\` JSON-RPC server; \`/api/upload-products\`; HMAC-signed webhooks.
-8. **Automations** - the workflows tables, a \`runWorkflow\` service that calls the runner with autoApprove, the \`/api/workflows\` routes, and the Automations page.
+8. **Automations** - the workflow tables, the n8n-shaped node-graph model + executor (agent / action / if / set nodes, run against a shared context), \`runWorkflow\` driving the runner with autoApprove, real cron scheduling (a \`tick\` endpoint), the produce → deliver → notify loop (\`save_report\`/\`generate_report\` artifacts, email/Drive delivery, notifications), and the React Flow canvas + JSON builder.
 9. **App shell** - the context-driven sidebar, the floating Copilot panel, the dashboard, inventory / companies / categories CRUD, docs, and the integrations directory.
 10. **Verify** - typecheck, lint (including the architecture-boundary rules), and a green production build; an offline smoke test that drives the modules and the full import pipeline against Postgres with no model spend; curl each face with a minted token.
 
@@ -1172,6 +1204,9 @@ These read from the same source of truth as every page, so the dashboard never d
 
 ## Reporting over the API
 The same analytics are available programmatically. Distru exposes **18 report endpoints** over the public API and MCP server - sales summaries (revenue + AR), best sellers, top customers, open-invoice / collections reports, inventory valuation, and more - so an external agent or BI tool can answer "how are sales?" and "who owes us money?" without scraping the UI. See [API, MCP, and webhooks](/docs/api-and-integrations) for connecting a client.
+
+## Save a snapshot to Reports
+Each report on the Insights page has a **Save to Reports** action - it snapshots the current numbers as a durable **[Report](/docs/reports)** (Markdown or CSV) you can download or have an [automation](/docs/automations) email out on a schedule. Under the hood the public API, this Insights list, and the \`generate_report\` tool all read a single **report registry**, so the numbers are identical everywhere.
 
 > Ask the Copilot *"what are my top 5 products this month?"* or *"what's my current inventory value?"* - it reads the same reports and answers in chat, no approval needed since nothing changes.`,
   },

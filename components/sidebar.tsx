@@ -18,6 +18,11 @@ type Item = NavItem;
 const MAIN = NAV_GROUPS;
 const SETTINGS = SETTINGS_ITEMS;
 
+// Section "eyebrow" label - small, bold, wide-tracked uppercase so it reads
+// clearly as a header rather than another (sentence-case, larger) nav link.
+const SECTION_LABEL =
+  "px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.09em] text-muted";
+
 function Row({ item, active }: { item: Item; active?: boolean }) {
   const { Icon } = item;
   const disabled = !item.href;
@@ -146,20 +151,10 @@ export function Sidebar({
                     {product.map(docLink)}
                   </div>
                   {engineering.length > 0 && (
-                    <div className="space-y-3 border-t pt-4">
-                      <div className="px-3">
-                        <div className="text-[11px] font-semibold uppercase tracking-wide text-fg">
-                          Architecture &amp; take-home
-                        </div>
-                        <div className="mt-0.5 text-[11px] leading-snug text-muted">
-                          How it&apos;s built, and the take-home write-up - above and beyond the ask.
-                        </div>
-                      </div>
+                    <div className="space-y-6 border-t pt-5">
                       {engSections.map((section) => (
                         <div key={section} className="space-y-0.5">
-                          <div className="px-3 pb-1 text-[11px] font-medium uppercase tracking-wide text-muted">
-                            {section}
-                          </div>
+                          <div className={SECTION_LABEL}>{section}</div>
                           {engineering
                             .filter((d) => d.section === section)
                             .map(docLink)}
@@ -177,9 +172,7 @@ export function Sidebar({
                 <div key={group.label} className="space-y-0.5">
                   {/* "Overview" is a single top-level item (Dashboard); it needs no header. */}
                   {group.label !== "Overview" && (
-                    <div className="px-3 pb-1 text-[11px] font-medium uppercase tracking-wide text-muted">
-                      {group.label}
-                    </div>
+                    <div className={SECTION_LABEL}>{group.label}</div>
                   )}
                   {group.items.map((item) => (
                     <Row
