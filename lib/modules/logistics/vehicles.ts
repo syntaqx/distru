@@ -42,8 +42,12 @@ export async function upsertVehicle(
     make?: string | null;
     model?: string | null;
     licensePlate?: string | null;
+    lat?: number | null;
+    lng?: number | null;
   },
 ) {
+  const coord = (v: number | null | undefined): string | null | undefined =>
+    v === undefined ? undefined : v === null || !Number.isFinite(v) ? null : Number(v).toFixed(6);
   if (input.id) {
     const [row] = await db
       .update(vehicles)
@@ -52,6 +56,8 @@ export async function upsertVehicle(
         ...(input.make !== undefined ? { make: input.make } : {}),
         ...(input.model !== undefined ? { model: input.model } : {}),
         ...(input.licensePlate !== undefined ? { licensePlate: input.licensePlate } : {}),
+        ...(input.lat !== undefined ? { lat: coord(input.lat) } : {}),
+        ...(input.lng !== undefined ? { lng: coord(input.lng) } : {}),
         updatedAt: new Date(),
       })
       .where(and(eq(vehicles.organizationId, ctx.orgId), eq(vehicles.id, input.id)))
@@ -68,6 +74,8 @@ export async function upsertVehicle(
       make: input.make ?? null,
       model: input.model ?? null,
       licensePlate: input.licensePlate ?? null,
+      lat: coord(input.lat) ?? null,
+      lng: coord(input.lng) ?? null,
     })
     .returning();
   return { row, created: true };
@@ -80,6 +88,8 @@ export function vehicleToApi(r: Row) {
     make: r.make ?? null,
     model: r.model ?? null,
     license_plate: r.licensePlate ?? null,
+    lat: r.lat != null ? Number(r.lat) : null,
+    lng: r.lng != null ? Number(r.lng) : null,
     inserted_datetime: datetime(r.createdAt),
     updated_datetime: datetime(r.updatedAt),
   };

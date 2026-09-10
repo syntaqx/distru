@@ -3,12 +3,16 @@
 import { useState } from "react";
 import Link from "next/link";
 import { IdCard, Pencil, Plus, Search, Truck } from "lucide-react";
+import { DeliveriesBoard, type DeliveryRow } from "@/components/fleet/deliveries-board";
+import { DispatchBoard, type FleetTelemetrySnapshot } from "@/components/fleet/dispatch-board";
 
 export type DriverRow = {
   id: string;
   name: string;
   phone: string | null;
   licenseNumber: string | null;
+  /** The org member behind this driver, when linked to a login (else null). */
+  memberId: string | null;
 };
 
 export type VehicleRow = {
@@ -19,17 +23,33 @@ export type VehicleRow = {
   licensePlate: string | null;
 };
 
-type Tab = "drivers" | "vehicles";
+type AssignableOrder = {
+  id: string;
+  orderNumber: string;
+  customerName: string | null;
+  status: string;
+};
+
+type Tab = "dispatch" | "deliveries" | "drivers" | "vehicles";
 
 export function FleetManager({
   drivers,
   vehicles,
+  deliveries,
+  assignableOrders,
+  telemetry,
 }: {
   drivers: DriverRow[];
   vehicles: VehicleRow[];
+  deliveries: DeliveryRow[];
+  assignableOrders: AssignableOrder[];
+  telemetry: FleetTelemetrySnapshot;
 }) {
-  const [tab, setTab] = useState<Tab>("drivers");
+  const [tab, setTab] = useState<Tab>("dispatch");
   const [q, setQ] = useState("");
+  const activeDeliveries = deliveries.filter(
+    (d) => d.status === "ASSIGNED" || d.status === "OUT_FOR_DELIVERY",
+  ).length;
 
   const query = q.toLowerCase();
   const filteredDrivers = drivers.filter(
@@ -49,6 +69,8 @@ export function FleetManager({
   );
 
   const tabs: { key: Tab; label: string }[] = [
+    { key: "dispatch", label: "Dispatch" },
+    { key: "deliveries", label: "Deliveries" },
     { key: "drivers", label: "Drivers" },
     { key: "vehicles", label: "Vehicles" },
   ];
@@ -57,6 +79,8 @@ export function FleetManager({
     <div>
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
+          ["Deliveries", deliveries.length],
+          ["Active", activeDeliveries],
           ["Drivers", drivers.length],
           ["Vehicles", vehicles.length],
         ].map(([label, value]) => (
@@ -87,28 +111,39 @@ export function FleetManager({
         </div>
       </div>
 
-      <div className="mb-4 flex items-center gap-2">
-        <div className="relative max-w-sm flex-1">
-          <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-          <input
-            className="input pl-9"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder={tab === "drivers" ? "Search drivers..." : "Search vehicles..."}
-          />
+      {(tab === "drivers" || tab === "vehicles") && (
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <div className="relative max-w-sm flex-1">
+            <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+            <input
+              className="input pl-9"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder={tab === "drivers" ? "Search drivers..." : "Search vehicles..."}
+            />
+          </div>
+          {tab === "drivers" ? (
+            <Link href="/fleet/drivers/new" className="btn btn-primary ml-auto">
+              <Plus size={16} /> New driver
+            </Link>
+          ) : (
+            <Link href="/fleet/vehicles/new" className="btn btn-primary ml-auto">
+              <Plus size={16} /> New vehicle
+            </Link>
+          )}
         </div>
-        {tab === "drivers" ? (
-          <Link href="/fleet/drivers/new" className="btn btn-primary ml-auto">
-            <Plus size={16} /> New driver
-          </Link>
-        ) : (
-          <Link href="/fleet/vehicles/new" className="btn btn-primary ml-auto">
-            <Plus size={16} /> New vehicle
-          </Link>
-        )}
-      </div>
+      )}
 
-      {tab === "drivers" ? (
+      {tab === "dispatch" ? (
+        <DispatchBoard telemetry={telemetry} />
+      ) : tab === "deliveries" ? (
+        <DeliveriesBoard
+          deliveries={deliveries}
+          drivers={drivers.map((d) => ({ id: d.id, name: d.name }))}
+          vehicles={vehicles.map((v) => ({ id: v.id, name: v.name }))}
+          assignableOrders={assignableOrders}
+        />
+      ) : tab === "drivers" ? (
         <div className="overflow-x-auto rounded-xl border">
           <table className="w-full min-w-140 text-sm">
             <thead>
@@ -123,7 +158,10 @@ export function FleetManager({
               {filteredDrivers.map((d) => (
                 <tr key={d.id} className="border-t" style={{ background: "var(--color-surface)" }}>
                   <td className="px-4 py-2.5 font-medium">
-                    <Link href={`/fleet/drivers/${d.id}/edit`} className="inline-flex items-center gap-2 hover:underline">
+                    <Link
+                      href={d.memberId ? `/settings/members/${d.memberId}` : `/fleet/drivers/${d.id}/edit`}
+                      className="inline-flex items-center gap-2 hover:underline"
+                    >
                       <IdCard size={15} className="text-muted" />
                       {d.name}
                     </Link>

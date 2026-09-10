@@ -363,7 +363,7 @@ function Canvas({
 
       {/* Config panel */}
       {selected && (
-        <div className="w-80 shrink-0 border-l bg-surface">
+        <div className="absolute inset-y-0 right-0 z-10 w-full border-l bg-surface md:static md:w-80 md:shrink-0">
           <NodeConfig
             key={selected.id}
             node={selected}

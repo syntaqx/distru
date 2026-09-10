@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, isNotNull, lte } from "drizzle-orm";
 import { db } from "@/db";
 import { licenses, licenseTypes } from "@/db/schema";
 import type { ServiceCtx } from "@/lib/modules/shared";
@@ -113,8 +113,11 @@ export async function upsertLicense(
     id?: string;
     licenseNumber?: string;
     licenseTypeId?: string | null;
+    companyId?: string | null;
     name?: string | null;
     state?: string | null;
+    active?: boolean;
+    issuedAt?: Date | null;
     expiresAt?: Date | null;
   },
 ) {
@@ -124,8 +127,11 @@ export async function upsertLicense(
       .set({
         ...(input.licenseNumber != null ? { licenseNumber: input.licenseNumber.trim() } : {}),
         ...(input.licenseTypeId !== undefined ? { licenseTypeId: input.licenseTypeId } : {}),
+        ...(input.companyId !== undefined ? { companyId: input.companyId } : {}),
         ...(input.name !== undefined ? { name: input.name } : {}),
         ...(input.state !== undefined ? { state: input.state } : {}),
+        ...(input.active !== undefined ? { active: input.active } : {}),
+        ...(input.issuedAt !== undefined ? { issuedAt: input.issuedAt } : {}),
         ...(input.expiresAt !== undefined ? { expiresAt: input.expiresAt } : {}),
         updatedAt: new Date(),
       })
@@ -141,22 +147,78 @@ export async function upsertLicense(
       organizationId: ctx.orgId,
       licenseNumber: input.licenseNumber.trim(),
       licenseTypeId: input.licenseTypeId ?? null,
+      companyId: input.companyId ?? null,
       name: input.name ?? null,
       state: input.state ?? null,
+      ...(input.active !== undefined ? { active: input.active } : {}),
+      issuedAt: input.issuedAt ?? null,
       expiresAt: input.expiresAt ?? null,
     })
     .returning();
   return { row, created: true };
 }
 
-export function licenseToApi(row: LicenseRow) {
+/** Licenses belonging to one company. */
+export async function listCompanyLicenses(ctx: ServiceCtx, companyId: string) {
+  return db
+    .select()
+    .from(licenses)
+    .where(and(eq(licenses.organizationId, ctx.orgId), eq(licenses.companyId, companyId)))
+    .orderBy(desc(licenses.createdAt));
+}
+
+/**
+ * Compliance check: does a company hold at least one currently-valid license?
+ * A license with no expiry is treated as valid. Used to flag selling to an
+ * unlicensed/expired customer.
+ */
+export async function validateCompanyLicense(
+  ctx: ServiceCtx,
+  companyId: string,
+): Promise<{ ok: boolean; activeCount: number; reason: string | null }> {
+  const rows = await listCompanyLicenses(ctx, companyId);
+  if (rows.length === 0)
+    return { ok: false, activeCount: 0, reason: "No license on file for this company." };
+  const now = Date.now();
+  const active = rows.filter((r) => !r.expiresAt || r.expiresAt.getTime() >= now);
+  if (active.length === 0)
+    return { ok: false, activeCount: 0, reason: "All licenses for this company are expired." };
+  return { ok: true, activeCount: active.length, reason: null };
+}
+
+/** Licenses expiring within `days` (default 30) - drives expiry alerts. */
+export async function expiringLicenses(ctx: ServiceCtx, days = 30) {
+  const now = new Date();
+  const horizon = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+  return db
+    .select()
+    .from(licenses)
+    .where(
+      and(
+        eq(licenses.organizationId, ctx.orgId),
+        isNotNull(licenses.expiresAt),
+        gte(licenses.expiresAt, now),
+        lte(licenses.expiresAt, horizon),
+      ),
+    )
+    .orderBy(asc(licenses.expiresAt));
+}
+
+export function licenseToApi(row: LicenseRow, typeName?: string | null) {
+  // `active` reflects both the stored flag and expiry: an expired license is
+  // never active, matching Distru's boolean.
+  const notExpired = !row.expiresAt || row.expiresAt.getTime() >= Date.now();
   return {
     id: row.id,
     license_number: row.licenseNumber,
     license_type_id: row.licenseTypeId ?? null,
+    license_type: typeName ?? null,
+    company_id: row.companyId ?? null,
     name: row.name ?? null,
     state: row.state ?? null,
-    expires_datetime: datetime(row.expiresAt),
+    active: row.active && notExpired,
+    issue_datetime: datetime(row.issuedAt),
+    expiry_datetime: datetime(row.expiresAt),
     inserted_datetime: datetime(row.createdAt),
     updated_datetime: datetime(row.updatedAt),
   };

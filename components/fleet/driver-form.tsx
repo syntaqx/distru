@@ -52,7 +52,7 @@ export function DriverForm({ initial }: { initial: DriverFormData }) {
       <div className="space-y-4">
         <section className="card">
           <h2 className="mb-3 text-sm font-semibold">Driver</h2>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="col-span-2">
               <label className={label}>Name</label>
               <input className="input" value={form.name} onChange={(e) => set("name", e.target.value)} autoFocus />

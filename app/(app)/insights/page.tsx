@@ -99,11 +99,11 @@ function BarRow({
   return (
     <div className="flex items-center gap-3 text-sm">
       <span className="w-4 text-right tabular-nums text-muted">{rank}</span>
-      <span className="w-40 truncate" title={name}>
+      <span className="w-24 truncate sm:w-40" title={name}>
         {name}
       </span>
       {meta !== undefined && (
-        <span className="w-24 truncate font-mono text-xs text-muted">{meta}</span>
+        <span className="hidden w-24 truncate font-mono text-xs text-muted sm:inline">{meta}</span>
       )}
       <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-surface2">
         <div
@@ -112,7 +112,7 @@ function BarRow({
         />
       </div>
       {units !== undefined && (
-        <span className="w-16 text-right tabular-nums text-muted">{units}</span>
+        <span className="hidden w-16 text-right tabular-nums text-muted sm:inline">{units}</span>
       )}
       <span className="w-24 text-right font-medium tabular-nums">{amount}</span>
     </div>
@@ -172,7 +172,7 @@ export default async function InsightsPage({
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <header className="flex items-center gap-4 border-b px-6 py-4">
+      <header className="flex flex-col gap-3 border-b px-4 py-4 sm:flex-row sm:items-center sm:gap-4 sm:px-6">
         <div>
           <h1 className="text-lg font-semibold">Insights</h1>
           <p className="text-sm text-muted">
@@ -180,12 +180,12 @@ export default async function InsightsPage({
             inventory - the same aggregates the Copilot and the Reports API see.
           </p>
         </div>
-        <div className="ml-auto">
+        <div className="sm:ml-auto">
           <PeriodTabs current={period} />
         </div>
       </header>
 
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto p-4 sm:p-6">
         <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Stat
             label="Booked revenue"

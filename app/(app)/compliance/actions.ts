@@ -51,10 +51,24 @@ export async function saveLicenseAction(
 export type TestResultForm = {
   id?: string;
   productId?: string;
+  packageId?: string;
   passed?: string;
   testedAt?: string;
+  coaUrl?: string;
+  metrcLabTestId?: string;
+  thcPercentage?: string;
+  cbdPercentage?: string;
+  thcMgPerUnit?: string;
+  cbdMgPerUnit?: string;
   notes?: string;
 };
+
+/** Parse a numeric string field into a number or null. */
+function numOrNull(v?: string | null): number | null {
+  if (v == null || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
 
 export async function saveTestResultAction(
   form: TestResultForm,
@@ -66,11 +80,19 @@ export async function saveTestResultAction(
     const { row } = await upsertTestResult(service, {
       id: form.id,
       productId: form.productId ? form.productId : null,
+      packageId: form.packageId ? form.packageId : null,
       passed: form.passed ? form.passed : null,
+      coaUrl: form.coaUrl?.trim() ? form.coaUrl.trim() : null,
+      metrcLabTestId: form.metrcLabTestId?.trim() ? form.metrcLabTestId.trim() : null,
+      thcPercentage: numOrNull(form.thcPercentage),
+      cbdPercentage: numOrNull(form.cbdPercentage),
+      thcMgPerUnit: numOrNull(form.thcMgPerUnit),
+      cbdMgPerUnit: numOrNull(form.cbdMgPerUnit),
       testedAt: dateOrNull(form.testedAt),
       results,
     });
     revalidatePath("/compliance");
+    revalidatePath(`/compliance/test-results/${row.id}`);
     return { ok: true, id: row.id };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Save failed." };

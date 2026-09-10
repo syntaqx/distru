@@ -46,6 +46,8 @@ export type ProductInput = {
   productGroupId?: string | null;
   unitTypeId?: string | null;
   unitPrice?: string | number | null;
+  unitCost?: string | number | null;
+  barcode?: string | null;
   msrp?: string | number | null;
   netQuantityPerUnit?: string | number | null;
   servingUnitTypeId?: string | null;
@@ -212,6 +214,8 @@ function normalizeValues(input: ProductInput) {
   assign("productGroupId", input.productGroupId);
   assign("unitTypeId", input.unitTypeId);
   assign("unitPrice", input.unitPrice == null ? input.unitPrice : String(input.unitPrice));
+  assign("unitCost", input.unitCost == null ? input.unitCost : String(input.unitCost));
+  assign("barcode", input.barcode);
   assign("msrp", input.msrp == null ? input.msrp : String(input.msrp));
   assign(
     "netQuantityPerUnit",
@@ -435,7 +439,8 @@ export function productToApi(p: ProductWithRefs) {
     // the wire shape matches; see DISTRU-PARITY.md §5 Tier 3).
     external_name: null,
     is_featured: false,
-    unit_cost: null,
+    unit_cost: num(r.unitCost),
+    barcode: r.barcode ?? null,
     wholesale_unit_price: null,
     total_cannabinoid_unit: null,
     quantity_available: null,

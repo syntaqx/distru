@@ -2,8 +2,9 @@ import {
   BarChart3,
   Bell,
   Boxes,
+  BookOpen,
   Building2,
-  Car,
+  CheckSquare,
   ClipboardList,
   CreditCard,
   Database,
@@ -12,6 +13,7 @@ import {
   KeyRound,
   LayoutDashboard,
   type LucideIcon,
+  Navigation,
   Package,
   RotateCcw,
   ScrollText,
@@ -39,6 +41,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Overview",
     items: [
       { label: "Dashboard", Icon: LayoutDashboard, href: "/dashboard" },
+      { label: "Tasks", Icon: CheckSquare, href: "/tasks" },
       { label: "Notifications", Icon: Bell, href: "/notifications" },
     ],
   },
@@ -61,9 +64,9 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Supply & Production",
     items: [
+      { label: "Fleet", Icon: Navigation, href: "/fleet" },
       { label: "Purchasing", Icon: Truck, href: "/purchasing" },
       { label: "Manufacturing", Icon: Factory, href: "/manufacturing" },
-      { label: "Fleet", Icon: Car, href: "/fleet" },
     ],
   },
   {
@@ -88,6 +91,7 @@ export const SETTINGS_ITEMS: NavItem[] = [
   { label: "Members", Icon: Users, href: "/settings/members" },
   { label: "Reference data", Icon: Database, href: "/settings/reference" },
   { label: "API tokens", Icon: KeyRound, href: "/settings/api-tokens" },
+  { label: "API reference", Icon: BookOpen, href: "/api-reference" },
   { label: "Webhooks", Icon: Webhook, href: "/settings/webhooks" },
   { label: "Integrations", Icon: Zap, href: "/settings/integrations" },
   { label: "Audit log", Icon: ClipboardList, href: "/settings/audit-log" },

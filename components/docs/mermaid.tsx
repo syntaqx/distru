@@ -20,6 +20,7 @@ function isDark() {
 export function MermaidDiagram({ chart }: { chart: string }) {
   const [svg, setSvg] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [themeKey, setThemeKey] = useState(0);
 
   // Re-render when the app theme flips (toggle or OS change).
@@ -57,6 +58,9 @@ export function MermaidDiagram({ chart }: { chart: string }) {
         mermaid.initialize({
           startOnLoad: false,
           securityLevel: "strict",
+          // Never let mermaid inject its own "Syntax error" graphic into the
+          // document body - we catch failures and render them inline instead.
+          suppressErrorRendering: true,
           theme: "base",
           fontFamily: "inherit",
           themeVariables: {
@@ -89,13 +93,27 @@ export function MermaidDiagram({ chart }: { chart: string }) {
           },
         });
         const id = "m" + Math.random().toString(36).slice(2);
-        const { svg } = await mermaid.render(id, chart);
-        if (!cancelled) {
-          setSvg(svg);
-          setFailed(false);
+        try {
+          // Validate first; on invalid syntax this throws with a useful message
+          // and we never call render (so nothing is injected into the DOM).
+          await mermaid.parse(chart);
+          const { svg } = await mermaid.render(id, chart);
+          if (!cancelled) {
+            setSvg(svg);
+            setFailed(false);
+            setErrorMsg(null);
+          }
+        } finally {
+          // Belt-and-suspenders: remove any stray node mermaid may have left.
+          document.getElementById(id)?.remove();
+          document.getElementById("d" + id)?.remove();
         }
-      } catch {
-        if (!cancelled) setFailed(true);
+      } catch (err) {
+        if (!cancelled) {
+          setFailed(true);
+          setSvg(null);
+          setErrorMsg(err instanceof Error ? err.message : "Invalid diagram syntax.");
+        }
       }
     })();
     return () => {
@@ -112,8 +130,21 @@ export function MermaidDiagram({ chart }: { chart: string }) {
       />
     );
   }
+  if (failed) {
+    // Show the error right where the diagram would be, with the source, so a
+    // broken diagram is easy to find and fix - and it never escapes the shell.
+    return (
+      <div className="doc-mermaid-error">
+        <div className="doc-mermaid-error-head">⚠ Diagram failed to render</div>
+        {errorMsg && <div className="doc-mermaid-error-msg">{errorMsg}</div>}
+        <pre>
+          <code>{chart}</code>
+        </pre>
+      </div>
+    );
+  }
   return (
-    <pre className="doc-shiki" aria-busy={!failed}>
+    <pre className="doc-shiki" aria-busy>
       <code>{chart}</code>
     </pre>
   );

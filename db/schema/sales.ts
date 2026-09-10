@@ -79,6 +79,9 @@ export const orderItems = pgTable(
     name: text().notNull(),
     quantity: numeric({ precision: 18, scale: 6 }).notNull().default("0"),
     unitPrice: numeric({ precision: 18, scale: 6 }).notNull().default("0"),
+    // Real COGS captured when the line ships (FIFO cost of the stock consumed),
+    // so an order's true gross margin is `SUM(quantity*unitPrice) - SUM(cogs)`.
+    cogs: numeric({ precision: 18, scale: 6 }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("order_items_order_idx").on(t.orderId)],

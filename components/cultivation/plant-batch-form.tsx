@@ -81,7 +81,7 @@ export function PlantBatchForm({
       )}
 
       <section className="card space-y-3">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className={label}>Batch number</label>
             <input

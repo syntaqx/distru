@@ -13,7 +13,7 @@ export default async function NewBinPage() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto p-4 sm:p-6">
         <BinForm
           initial={{ name: "", locationId: "" }}
           locations={locations.map((l) => ({ id: l.id, name: l.name }))}

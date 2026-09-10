@@ -83,7 +83,7 @@ export function PoForm({
       <div className="space-y-4">
         <section className="card">
           <h2 className="mb-3 text-sm font-semibold">Details</h2>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className={label}>Vendor</label>
               <Combobox
@@ -131,7 +131,7 @@ export function PoForm({
                       }))}
                     />
                   </div>
-                  <span className="min-w-32 flex-1 truncate text-xs text-muted">
+                  <span className="hidden min-w-32 flex-1 truncate text-xs text-muted sm:block">
                     {p?.name ?? ""}
                   </span>
                   <input

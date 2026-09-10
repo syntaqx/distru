@@ -6,7 +6,12 @@ import {
   pageOffset,
   requireScope,
 } from "@/lib/public-api";
-import { listBatches, upsertBatch, batchToApi } from "@/lib/modules/inventory";
+import {
+  inventoryValueByProduct,
+  listBatches,
+  upsertBatch,
+  batchToApi,
+} from "@/lib/modules/inventory";
 
 export async function GET(req: Request) {
   const auth = await authenticate(req);
@@ -15,7 +20,13 @@ export async function GET(req: Request) {
   if (scopeErr) return scopeErr;
   const offset = pageOffset(req);
   const { items, total } = await listBatches(auth.ctx, { limit: PAGE_SIZE, offset });
-  return listEnvelope(req, items.map(batchToApi), offset, total);
+  const value = await inventoryValueByProduct(auth.ctx);
+  const data = items.map((b) => {
+    const v = b.productId ? value.get(b.productId) : undefined;
+    const perUnit = v && v.qty > 0 ? v.value / v.qty : 0;
+    return batchToApi(b, { perUnit, total: perUnit * Number(b.quantity ?? 0) });
+  });
+  return listEnvelope(req, data, offset, total);
 }
 
 export async function POST(req: Request) {
@@ -31,7 +42,11 @@ export async function POST(req: Request) {
     const { row, created } = await upsertBatch(auth.ctx, {
       id: body.id as string | undefined,
       batchNumber: body.batch_number as string | undefined,
+      name: (body.name as string) ?? null,
       productId: (body.product_id as string) ?? null,
+      quantity: body.quantity_active as string | number | undefined,
+      thc: body.thc as string | number | undefined,
+      cbd: body.cbd as string | number | undefined,
     });
     return Response.json({ data: batchToApi(row) }, { status: created ? 201 : 200 });
   } catch (err) {

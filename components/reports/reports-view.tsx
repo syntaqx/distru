@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Streamdown } from "streamdown";
-import { Cloud, Download, Loader2, Mail, ScrollText } from "lucide-react";
+import { ArrowLeft, Cloud, Download, Loader2, Mail, ScrollText } from "lucide-react";
 import { timeAgo } from "@/lib/format";
 
 export type Delivery = { destination: string; target: string; externalId: string | null; at: string };
@@ -35,6 +35,9 @@ export function ReportsView({ initial }: { initial: ReportLite[] }) {
   const [selectedId, setSelectedId] = useState<string | null>(urlId ?? initial[0]?.id ?? null);
   const [report, setReport] = useState<ReportFull | null>(null);
   const [loading, setLoading] = useState(false);
+  // Mobile is a master-detail: the list, then the viewer with a back button.
+  // Desktop shows both side-by-side regardless.
+  const [mobileDetail, setMobileDetail] = useState(!!urlId);
 
   const load = useCallback(async (id: string) => {
     setLoading(true);
@@ -74,8 +77,11 @@ export function ReportsView({ initial }: { initial: ReportLite[] }) {
 
   return (
     <div className="flex h-full min-h-0">
-      {/* List */}
-      <aside className="flex w-72 shrink-0 flex-col border-r">
+      {/* List — full-width on mobile, a fixed rail on desktop. Hidden on mobile
+          once you're viewing a report. */}
+      <aside
+        className={`${mobileDetail ? "hidden md:flex" : "flex"} w-full shrink-0 flex-col border-r md:w-72`}
+      >
         <div className="flex-1 overflow-auto p-2">
           {reports.length === 0 ? (
             <div className="p-6 text-center">
@@ -89,7 +95,10 @@ export function ReportsView({ initial }: { initial: ReportLite[] }) {
             reports.map((r) => (
               <button
                 key={r.id}
-                onClick={() => setSelectedId(r.id)}
+                onClick={() => {
+                  setSelectedId(r.id);
+                  setMobileDetail(true);
+                }}
                 className={`mb-0.5 flex w-full flex-col gap-1 rounded-lg px-3 py-2 text-left transition-colors ${
                   r.id === selectedId ? "text-fg" : "text-muted hover:bg-surface2 hover:text-fg"
                 }`}
@@ -109,17 +118,25 @@ export function ReportsView({ initial }: { initial: ReportLite[] }) {
         </div>
       </aside>
 
-      {/* Viewer */}
-      <section className="min-w-0 flex-1 overflow-auto">
+      {/* Viewer — hidden on mobile until a report is opened. */}
+      <section
+        className={`${mobileDetail ? "flex" : "hidden md:flex"} min-w-0 flex-1 flex-col overflow-auto`}
+      >
         {!meta ? (
           <div className="grid h-full place-items-center p-8 text-center text-sm text-muted">
             Select a report to view it.
           </div>
         ) : (
-          <div className="mx-auto max-w-3xl p-6">
-            <div className="flex items-start gap-3">
+          <div className="mx-auto w-full max-w-3xl p-4 sm:p-6">
+            <button
+              className="mb-3 flex items-center gap-1 text-sm text-muted hover:text-fg md:hidden"
+              onClick={() => setMobileDetail(false)}
+            >
+              <ArrowLeft size={15} /> All reports
+            </button>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
               <div className="min-w-0 flex-1">
-                <h2 className="text-base font-semibold">{meta.title}</h2>
+                <h2 className="text-base font-semibold wrap-break-word">{meta.title}</h2>
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
                   <span className="badge text-[10px] uppercase">{meta.format}</span>
                   <span>Created {timeAgo(meta.createdAt)}</span>

@@ -65,11 +65,16 @@ export function TopProgress() {
       }
       start();
     }
+    // Programmatic navigations (e.g. a form's router.push) can start the bar by
+    // dispatching `distru:nav:start`.
+    const onNavStart = () => start();
     document.addEventListener("click", onClick, true);
     window.addEventListener("popstate", start);
+    window.addEventListener("distru:nav:start", onNavStart);
     return () => {
       document.removeEventListener("click", onClick, true);
       window.removeEventListener("popstate", start);
+      window.removeEventListener("distru:nav:start", onNavStart);
     };
   }, [start]);
 

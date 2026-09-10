@@ -93,7 +93,7 @@ export function ReturnForm({
       <div className="space-y-4">
         <section className="card">
           <h2 className="mb-3 text-sm font-semibold">Details</h2>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className={label}>Customer</label>
               <Combobox
@@ -114,7 +114,7 @@ export function ReturnForm({
                 options={orderNumbers.map((o) => ({ value: o, label: o }))}
               />
             </div>
-            <div className="col-span-2">
+            <div className="sm:col-span-2">
               <label className={label}>Reason (optional)</label>
               <input
                 className="input w-full"
@@ -145,7 +145,7 @@ export function ReturnForm({
                       }))}
                     />
                   </div>
-                  <span className="min-w-32 flex-1 truncate text-xs text-muted">
+                  <span className="hidden min-w-32 flex-1 truncate text-xs text-muted sm:block">
                     {p?.name ?? ""}
                   </span>
                   <input

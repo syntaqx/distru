@@ -5,11 +5,16 @@ import {
   pageOffset,
   requireScope,
 } from "@/lib/public-api";
-import { getDefaultLocation, listProducts } from "@/lib/modules/catalog";
-import { getOnHand } from "@/lib/modules/inventory";
+import { listProducts } from "@/lib/modules/catalog";
+import { inventoryValueByProduct, onHandByProduct } from "@/lib/modules/inventory";
+import { reservedByProduct } from "@/lib/modules/sales";
 import { num } from "@/lib/modules/shared";
 
-/** On-hand snapshot across active products at the org's default location. */
+/**
+ * GET /public/v1/inventory - on-hand snapshot per product with Distru's
+ * availability split: `active` (physical on-hand), `reserved` (soft-held on
+ * PENDING orders), `available` (active - reserved), plus cost at FIFO valuation.
+ */
 export async function GET(req: Request) {
   const auth = await authenticate(req);
   if (auth instanceof Response) return auth;
@@ -17,22 +22,31 @@ export async function GET(req: Request) {
   if (scopeErr) return scopeErr;
 
   const offset = pageOffset(req);
-  const location = await getDefaultLocation(auth.ctx);
-  const { items, total } = await listProducts(auth.ctx, {
-    status: "ACTIVE",
-    limit: PAGE_SIZE,
-    offset,
-  });
+  const [{ items, total }, active, reserved, value] = await Promise.all([
+    listProducts(auth.ctx, { status: "ACTIVE", limit: PAGE_SIZE, offset }),
+    onHandByProduct(auth.ctx),
+    reservedByProduct(auth.ctx),
+    inventoryValueByProduct(auth.ctx),
+  ]);
 
-  const data = await Promise.all(
-    items.map(async (item) => ({
-      product_id: item.product.id,
+  const data = items.map((item) => {
+    const id = item.product.id;
+    const act = active.get(id) ?? 0;
+    const res = reserved.get(id) ?? 0;
+    const val = value.get(id);
+    const perUnit = val && val.qty > 0 ? val.value / val.qty : 0;
+    return {
+      product_id: id,
       sku: item.product.sku,
       name: item.product.name,
-      location: location.name,
-      quantity: num(await getOnHand(auth.ctx, item.product.id, location.id)),
-    })),
-  );
+      active: num(act),
+      reserved: num(res),
+      available: num(act - res),
+      quantity: num(act),
+      cost_per_unit_actual: num(perUnit),
+      total_cost_actual: num(val?.value ?? 0),
+    };
+  });
 
   return listEnvelope(req, data, offset, total);
 }

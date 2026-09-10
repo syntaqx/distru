@@ -1,15 +1,16 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useCallback, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { X } from "lucide-react";
+import { Camera, X } from "lucide-react";
 import {
   savePackageAction,
   type PackageForm as PackageFormData,
 } from "@/app/(app)/inventory/depth-actions";
 import { Select } from "@/components/ui/select";
 import { Combobox } from "@/components/ui/combobox";
+import { CameraScanner } from "@/components/inventory/camera-scanner";
 
 export type ProductOption = { id: string; name: string };
 export type LocationOption = { id: string; name: string };
@@ -32,10 +33,17 @@ export function PackageForm({
     products.find((p) => p.id === initial.productId)?.name ?? "",
   );
   const [error, setError] = useState<string | null>(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
   const isEdit = !!initial.id;
 
   const set = <K extends keyof PackageFormData>(k: K, v: PackageFormData[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
+
+  // Scanned a package/barcode: fill the tag field and close the camera.
+  const onScan = useCallback((value: string) => {
+    setForm((f) => ({ ...f, packageTag: value }));
+    setCameraOpen(false);
+  }, []);
 
   function onProductInput(text: string) {
     setProductLabel(text);
@@ -82,16 +90,28 @@ export function PackageForm({
 
       <div className="space-y-4">
         <section className="card">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="col-span-2">
               <label className={label}>Package tag</label>
-              <input
-                className="input"
-                value={form.packageTag}
-                onChange={(e) => set("packageTag", e.target.value)}
-                placeholder="1A4000000000000000000001"
-                autoFocus
-              />
+              <div className="flex gap-2">
+                <input
+                  className="input"
+                  value={form.packageTag}
+                  onChange={(e) => set("packageTag", e.target.value)}
+                  placeholder="1A4000000000000000000001"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  className="btn btn-outline shrink-0"
+                  onClick={() => setCameraOpen(true)}
+                  title="Scan the package tag with your camera"
+                  aria-label="Scan the package tag with your camera"
+                >
+                  <Camera size={15} />
+                  <span className="hidden sm:inline">Scan</span>
+                </button>
+              </div>
             </div>
             <div className="col-span-2">
               <label className={label}>Product</label>
@@ -153,6 +173,8 @@ export function PackageForm({
           {pending ? "Saving…" : isEdit ? "Save changes" : "Create package"}
         </button>
       </div>
+
+      <CameraScanner open={cameraOpen} onOpenChange={setCameraOpen} onDetect={onScan} />
     </div>
   );
 }

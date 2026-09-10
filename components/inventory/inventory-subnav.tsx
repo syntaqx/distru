@@ -8,6 +8,8 @@ const TABS = [
   { label: "Packages", href: "/inventory/packages" },
   { label: "Batches", href: "/inventory/batches" },
   { label: "Bins", href: "/inventory/bins" },
+  { label: "Transfers", href: "/inventory/transfers" },
+  { label: "Valuation", href: "/inventory/valuation" },
 ] as const;
 
 /**
@@ -24,9 +26,9 @@ export function InventorySubnav() {
   }
 
   return (
-    <div className="mb-6 flex">
+    <div className="mb-6 flex overflow-x-auto">
       <div
-        className="flex rounded-lg border p-0.5"
+        className="flex w-max rounded-lg border p-0.5"
         style={{ background: "var(--color-surface)" }}
       >
         {TABS.map((t) => {
@@ -35,7 +37,7 @@ export function InventorySubnav() {
             <Link
               key={t.href}
               href={t.href}
-              className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
+              className={`rounded-md px-3 py-1.5 text-sm whitespace-nowrap transition-colors ${
                 active ? "text-fg" : "text-muted hover:text-fg"
               }`}
               style={active ? { background: "var(--color-surface2)" } : undefined}

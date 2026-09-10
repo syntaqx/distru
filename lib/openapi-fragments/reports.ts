@@ -64,6 +64,43 @@ const REPORTS: ReportDef[] = [
     dateParam: "invoice_datetime",
   },
   {
+    name: "sales-matrix",
+    summary: "Sales matrix (units by month)",
+    description:
+      "Units sold per product across the last six calendar months, one column per month plus a row total - the sales matrix.",
+  },
+  {
+    name: "sales-by-month",
+    summary: "Sales by month",
+    description: "Booked revenue, units, and order counts grouped by calendar month - the sales trend.",
+    dateParam: "order_datetime",
+  },
+  {
+    name: "margin-by-product",
+    summary: "Margin by product",
+    description:
+      "Gross margin per product across booked orders: revenue minus real COGS (order_items.cogs), with margin %.",
+    dateParam: "order_datetime",
+  },
+  {
+    name: "ar-aging",
+    summary: "AR aging",
+    description:
+      "Open invoice balances bucketed by age (0-30 / 31-60 / 61-90 / 90+ days) and rolled up per customer company.",
+  },
+  {
+    name: "payments-received",
+    summary: "Payments received",
+    description: "Payments received grouped by payment method, with count and total.",
+    dateParam: "payment_datetime",
+  },
+  {
+    name: "low-stock",
+    summary: "Low stock / reorder",
+    description:
+      "Active, inventory-tracked products at or below the reorder threshold, with on-hand and suggested reorder quantity.",
+  },
+  {
     name: "cogs",
     summary: "Cost of goods sold",
     description:

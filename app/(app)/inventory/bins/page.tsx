@@ -25,13 +25,13 @@ export default async function BinsPage() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <header className="border-b px-6 py-4">
+      <header className="border-b px-4 py-4 sm:px-6">
         <h1 className="text-lg font-semibold">Inventory</h1>
         <p className="text-sm text-muted">
           Storage bins - the finest-grained stock positions within a location.
         </p>
       </header>
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto p-4 sm:p-6">
         <BinsManager bins={bins} />
       </div>
     </div>

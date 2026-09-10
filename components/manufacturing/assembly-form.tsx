@@ -10,8 +10,15 @@ import {
   type AssemblyLineForm,
 } from "@/app/(app)/manufacturing/actions";
 import { Select } from "@/components/ui/select";
+import { AlertTriangle } from "lucide-react";
 
-export type ProductOption = { id: string; sku: string; name: string };
+export type ProductOption = {
+  id: string;
+  sku: string;
+  name: string;
+  /** Available to plan = on-hand minus stock reserved by other runs. */
+  available?: number;
+};
 
 const STATUSES = ["PENDING", "IN_PROGRESS", "COMPLETED", "CANCELED"] as const;
 
@@ -29,6 +36,10 @@ export function AssemblyForm({
     outputProductId: "",
     outputQuantity: "1",
     inputs: [{ productId: "", quantity: "1" }],
+    scheduledStart: "",
+    scheduledEnd: "",
+    estimatedWorkMinutes: "",
+    assignedTo: "",
   });
   const [error, setError] = useState<string | null>(null);
 
@@ -36,6 +47,7 @@ export function AssemblyForm({
     { value: "", label: "Select a product…" },
     ...products.map((p) => ({ value: p.id, label: `${p.name} (${p.sku})` })),
   ];
+  const availableById = new Map(products.map((p) => [p.id, p.available]));
 
   const set = <K extends keyof AssemblyFormData>(k: K, v: AssemblyFormData[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -92,7 +104,7 @@ export function AssemblyForm({
       <div className="space-y-4">
         <section className="card">
           <h2 className="mb-3 text-sm font-semibold">Output</h2>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="col-span-2">
               <label className={label}>Output product</label>
               <Select
@@ -125,39 +137,105 @@ export function AssemblyForm({
             </button>
           </div>
           <div className="space-y-2">
-            {form.inputs.map((line, idx) => (
-              <div key={idx} className="grid grid-cols-3 gap-3">
-                <div className="col-span-2">
-                  <Select
-                    ariaLabel={`Input product ${idx + 1}`}
-                    value={line.productId}
-                    onValueChange={(v) => setLine(idx, { productId: v })}
-                    placeholder="Select a product…"
-                    options={productOptions}
-                  />
+            {form.inputs.map((line, idx) => {
+              const available = line.productId ? availableById.get(line.productId) : undefined;
+              const qty = Number(line.quantity);
+              const short =
+                available != null && Number.isFinite(qty) && qty > 0 && qty > available;
+              return (
+                <div key={idx} className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div className="col-span-2">
+                    <Select
+                      ariaLabel={`Input product ${idx + 1}`}
+                      value={line.productId}
+                      onValueChange={(v) => setLine(idx, { productId: v })}
+                      placeholder="Select a product…"
+                      options={productOptions}
+                    />
+                    {available != null && (
+                      <p
+                        className={`mt-1 text-xs ${short ? "text-danger" : "text-muted"}`}
+                      >
+                        {short && (
+                          <AlertTriangle size={11} className="mr-1 inline align-[-1px]" />
+                        )}
+                        {available} available to plan
+                        {short ? " - exceeds available" : ""}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      className="input"
+                      type="number"
+                      min="0"
+                      step="any"
+                      aria-label={`Input quantity ${idx + 1}`}
+                      value={line.quantity}
+                      onChange={(e) => setLine(idx, { quantity: e.target.value })}
+                    />
+                    <button
+                      className="btn btn-ghost px-2 py-1"
+                      onClick={() => removeLine(idx)}
+                      disabled={form.inputs.length === 1}
+                      aria-label={`Remove input ${idx + 1}`}
+                      title="Remove input"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    className="input"
-                    type="number"
-                    min="0"
-                    step="any"
-                    aria-label={`Input quantity ${idx + 1}`}
-                    value={line.quantity}
-                    onChange={(e) => setLine(idx, { quantity: e.target.value })}
-                  />
-                  <button
-                    className="btn btn-ghost px-2 py-1"
-                    onClick={() => removeLine(idx)}
-                    disabled={form.inputs.length === 1}
-                    aria-label={`Remove input ${idx + 1}`}
-                    title="Remove input"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="card">
+          <h2 className="mb-1 text-sm font-semibold">Schedule</h2>
+          <p className="mb-3 text-xs text-muted">
+            Optional. Plan a production window and assignee; the run stays pending
+            until you start it.
+          </p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className={label}>Scheduled start</label>
+              <input
+                className="input"
+                type="datetime-local"
+                value={form.scheduledStart ?? ""}
+                onChange={(e) => set("scheduledStart", e.target.value)}
+              />
+            </div>
+            <div>
+              <label className={label}>Scheduled end</label>
+              <input
+                className="input"
+                type="datetime-local"
+                value={form.scheduledEnd ?? ""}
+                onChange={(e) => set("scheduledEnd", e.target.value)}
+              />
+            </div>
+            <div>
+              <label className={label}>Estimated work (minutes)</label>
+              <input
+                className="input"
+                type="number"
+                min="0"
+                step="1"
+                value={form.estimatedWorkMinutes ?? ""}
+                onChange={(e) => set("estimatedWorkMinutes", e.target.value)}
+              />
+            </div>
+            <div>
+              <label className={label}>Assigned to</label>
+              <input
+                className="input"
+                type="text"
+                placeholder="Operator or crew"
+                value={form.assignedTo ?? ""}
+                onChange={(e) => set("assignedTo", e.target.value)}
+              />
+            </div>
           </div>
         </section>
 

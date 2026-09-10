@@ -68,7 +68,7 @@ export default async function InvoiceDetailPage({
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <header className="flex items-center justify-between border-b px-6 py-4">
+      <header className="flex items-center justify-between border-b px-4 py-4 sm:px-6">
         <div className="flex items-center gap-3">
           <Link
             href="/sales"
@@ -95,7 +95,7 @@ export default async function InvoiceDetailPage({
         </div>
       </header>
 
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto p-4 sm:p-6">
         <div className="mx-auto max-w-4xl space-y-4">
           <section className="card">
             <h2 className="mb-3 text-sm font-semibold">Details</h2>

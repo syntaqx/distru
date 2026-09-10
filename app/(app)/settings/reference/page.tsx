@@ -64,7 +64,7 @@ export default async function ReferenceSettingsPage() {
 
   return (
     <div className="h-full overflow-auto">
-      <div className="mx-auto max-w-4xl px-6 py-8">
+      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
         <header className="mb-6">
           <h1 className="text-lg font-semibold">Reference data</h1>
           <p className="text-sm text-muted">

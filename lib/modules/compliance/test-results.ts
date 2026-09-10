@@ -42,18 +42,37 @@ export async function upsertTestResult(
   input: {
     id?: string;
     productId?: string | null;
+    packageId?: string | null;
     metrcLabTestId?: string | null;
+    name?: string | null;
+    coaUrl?: string | null;
+    thcPercentage?: string | number | null;
+    cbdPercentage?: string | number | null;
+    thcMgPerUnit?: string | number | null;
+    cbdMgPerUnit?: string | number | null;
     testedAt?: Date | null;
     passed?: string | null;
     results?: Record<string, unknown>;
   },
 ) {
+  const numOrNull = (v: string | number | null | undefined) =>
+    v == null ? v : String(v);
+  const potency = {
+    ...(input.thcPercentage !== undefined ? { thcPercentage: numOrNull(input.thcPercentage) } : {}),
+    ...(input.cbdPercentage !== undefined ? { cbdPercentage: numOrNull(input.cbdPercentage) } : {}),
+    ...(input.thcMgPerUnit !== undefined ? { thcMgPerUnit: numOrNull(input.thcMgPerUnit) } : {}),
+    ...(input.cbdMgPerUnit !== undefined ? { cbdMgPerUnit: numOrNull(input.cbdMgPerUnit) } : {}),
+  };
   if (input.id) {
     const [row] = await db
       .update(testResults)
       .set({
         ...(input.productId !== undefined ? { productId: input.productId } : {}),
+        ...(input.packageId !== undefined ? { packageId: input.packageId } : {}),
         ...(input.metrcLabTestId !== undefined ? { metrcLabTestId: input.metrcLabTestId } : {}),
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.coaUrl !== undefined ? { coaUrl: input.coaUrl } : {}),
+        ...potency,
         ...(input.testedAt !== undefined ? { testedAt: input.testedAt } : {}),
         ...(input.passed !== undefined ? { passed: input.passed } : {}),
         ...(input.results !== undefined ? { results: input.results } : {}),
@@ -69,7 +88,11 @@ export async function upsertTestResult(
     .values({
       organizationId: ctx.orgId,
       productId: input.productId ?? null,
+      packageId: input.packageId ?? null,
       metrcLabTestId: input.metrcLabTestId ?? null,
+      name: input.name ?? null,
+      coaUrl: input.coaUrl ?? null,
+      ...potency,
       testedAt: input.testedAt ?? null,
       passed: input.passed ?? null,
       ...(input.results !== undefined ? { results: input.results } : {}),
@@ -78,11 +101,30 @@ export async function upsertTestResult(
   return { row, created: true };
 }
 
+/** The COA tied directly to a package (lot-level), most recent first. */
+export async function getPackageTestResult(ctx: ServiceCtx, packageId: string) {
+  const [row] = await db
+    .select()
+    .from(testResults)
+    .where(and(eq(testResults.organizationId, ctx.orgId), eq(testResults.packageId, packageId)))
+    .orderBy(desc(testResults.createdAt))
+    .limit(1);
+  return row ?? null;
+}
+
 export function testResultToApi(row: TestResultRow) {
+  const n = (v: string | null) => (v == null ? null : v);
   return {
     id: row.id,
+    name: row.name ?? null,
     product_id: row.productId ?? null,
+    package_id: row.packageId ?? null,
     metrc_lab_test_id: row.metrcLabTestId ?? null,
+    coa_url: row.coaUrl ?? null,
+    thc_percentage: n(row.thcPercentage),
+    cbd_percentage: n(row.cbdPercentage),
+    thc_mg_per_unit: n(row.thcMgPerUnit),
+    cbd_mg_per_unit: n(row.cbdMgPerUnit),
     tested_datetime: datetime(row.testedAt),
     passed: row.passed ?? null,
     results: row.results,

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { defineTool, type AgentContext } from "../tool";
 import type { HarnessToolPreview } from "../types";
 import {
+  getAssembly,
   listAssemblies,
   upsertAssembly,
   type AssemblyLineInput,
@@ -123,4 +124,60 @@ export const listAssembliesTool = defineTool({
   },
 });
 
-export const manufacturingTools = [createAssemblyTool, listAssembliesTool];
+/** Find an assembly by its number (e.g. ASM-0001) within the org. */
+async function findAssemblyByNumber(ctx: AgentContext, assemblyNumber: string) {
+  const { items } = await listAssemblies(ctx.service, { limit: 200 });
+  const match = items.find((a) => a.assemblyNumber === assemblyNumber);
+  return match ? await getAssembly(ctx.service, match.id) : null;
+}
+
+export const completeAssemblyTool = defineTool({
+  name: "complete_assembly",
+  description:
+    "Complete (run) a manufacturing assembly by its number. This posts inventory " +
+    "for real: it consumes each input FIFO, rolls the input cost plus applied " +
+    "labor/overhead into a per-unit output cost, and produces the outputs as " +
+    "costed stock. Blocks if an input exceeds on-hand. Idempotent once posted.",
+  gate: "confirmation",
+  inputSchema: z.object({
+    assembly_number: z.string().describe("The assembly number, e.g. ASM-0001"),
+  }),
+  async buildPreview(input, ctx) {
+    const asm = await findAssemblyByNumber(ctx, input.assembly_number);
+    if (!asm)
+      return confirm("Complete assembly", `Assembly ${input.assembly_number} not found.`, [], "low");
+    return confirm(
+      "Complete assembly",
+      `Run ${asm.assemblyNumber}: consume ${asm.inputs.length} input line(s), produce ${asm.outputs.length} output line(s), and post inventory.`,
+      [
+        { label: "Status", value: asm.status },
+        { label: "Already posted", value: asm.inventoryPosted ? "yes" : "no" },
+      ],
+      "medium",
+    );
+  },
+  async execute(input, ctx) {
+    const asm = await findAssemblyByNumber(ctx, input.assembly_number);
+    if (!asm)
+      return { ok: false, summary: `Assembly ${input.assembly_number} not found.` };
+    try {
+      await upsertAssembly(ctx.service, { id: asm.id, status: "COMPLETED" });
+      const done = await getAssembly(ctx.service, asm.id);
+      const outputs = done?.outputs ?? [];
+      const unitCost = outputs[0]?.unitCost ?? null;
+      return {
+        ok: true,
+        summary: `Completed ${asm.assemblyNumber}: inputs consumed, ${outputs.length} output(s) produced${unitCost ? ` at ${unitCost}/unit` : ""}.`,
+        data: {
+          assembly_number: asm.assemblyNumber,
+          status: "COMPLETED",
+          output_unit_cost: unitCost,
+        },
+      };
+    } catch (err) {
+      return { ok: false, summary: err instanceof Error ? err.message : "Assembly completion failed." };
+    }
+  },
+});
+
+export const manufacturingTools = [createAssemblyTool, completeAssemblyTool, listAssembliesTool];

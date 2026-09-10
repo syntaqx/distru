@@ -4,6 +4,7 @@ import type { ServiceCtx } from "@/lib/modules/shared";
 import { datetime, recordAudit } from "@/lib/modules/shared";
 import { and, count, desc, eq } from "drizzle-orm";
 import type { PlantPhase } from "./plant-batches";
+import { logPlantEvent } from "./plant-events";
 
 type Row = typeof plants.$inferSelect;
 
@@ -101,6 +102,12 @@ export async function movePlantPhase(ctx: ServiceCtx, id: string, phase: PlantPh
     entityId: id,
     before: { phase: before.phase },
     after: { phase },
+  });
+  await logPlantEvent(ctx, {
+    plantId: id,
+    type: phase === "DESTROYED" ? "DESTROY" : "PHASE_CHANGE",
+    note: `${before.phase} → ${phase}`,
+    detail: JSON.stringify({ from: before.phase, to: phase }),
   });
   return row;
 }

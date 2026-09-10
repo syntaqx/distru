@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { inventoryLedger } from "@/db/schema";
 import type { ServiceCtx } from "../shared";
 import { recordAudit } from "../shared";
+import { issueStock, receiveStock } from "./costing";
 
 /** Current on-hand for a product (optionally at one location) = SUM(deltas). */
 export async function getOnHand(
@@ -22,6 +23,41 @@ export async function getOnHand(
   return Number(row?.total ?? 0);
 }
 
+/**
+ * List inventory movements as adjustments (Distru's StockAdjustment list),
+ * newest first, with the location name joined. Every ledger row is a movement;
+ * the `reason`/`refType` say what caused it.
+ */
+export async function listAdjustments(
+  ctx: ServiceCtx,
+  { limit, offset }: { limit?: number; offset?: number } = {},
+) {
+  const lim = Math.min(Math.max(limit ?? 50, 1), 200);
+  const off = Math.max(offset ?? 0, 0);
+  const where = eq(inventoryLedger.organizationId, ctx.orgId);
+  const rows = await db
+    .select({
+      id: inventoryLedger.id,
+      productId: inventoryLedger.productId,
+      locationId: inventoryLedger.locationId,
+      quantityDelta: inventoryLedger.quantityDelta,
+      unitCost: inventoryLedger.unitCost,
+      reason: inventoryLedger.reason,
+      refType: inventoryLedger.refType,
+      createdAt: inventoryLedger.createdAt,
+    })
+    .from(inventoryLedger)
+    .where(where)
+    .orderBy(sql`${inventoryLedger.createdAt} desc`)
+    .limit(lim)
+    .offset(off);
+  const [row] = await db
+    .select({ total: sql<string>`count(*)` })
+    .from(inventoryLedger)
+    .where(where);
+  return { items: rows, total: Number(row?.total ?? 0), limit: lim, offset: off };
+}
+
 /** Map of productId → total on-hand across all locations for the org. */
 export async function onHandByProduct(ctx: ServiceCtx) {
   const rows = await db
@@ -37,7 +73,16 @@ export async function onHandByProduct(ctx: ServiceCtx) {
   return map;
 }
 
-/** Post an inventory movement. Returns the new on-hand at that location. */
+/**
+ * Post an inventory movement. Returns the new on-hand at that location.
+ *
+ * Delegates to the FIFO cost engine so every caller gets lot costing for free:
+ * a positive delta opens a cost layer (at the product's standard cost), a
+ * negative delta draws layers down oldest-first. Adjustments may drive on-hand
+ * negative (cycle-count corrections), so this path allows it; the typed
+ * order/purchase/assembly paths block instead. Records `inventory.adjust` itself
+ * and suppresses the primitive's own audit so the activity feed stays clean.
+ */
 export async function adjustInventory(
   ctx: ServiceCtx,
   input: {
@@ -45,16 +90,31 @@ export async function adjustInventory(
     locationId: string;
     delta: number;
     reason?: string;
+    /** Cost layer opened on a positive adjustment; defaults to standard cost. */
+    unitCost?: number;
   },
 ) {
-  await db.insert(inventoryLedger).values({
-    organizationId: ctx.orgId,
-    productId: input.productId,
-    locationId: input.locationId,
-    quantityDelta: String(input.delta),
-    reason: input.reason ?? "adjustment",
-    actor: ctx.actor,
-  });
+  if (input.delta > 0) {
+    await receiveStock(ctx, {
+      productId: input.productId,
+      locationId: input.locationId,
+      qty: input.delta,
+      unitCost: input.unitCost,
+      sourceType: "ADJUSTMENT",
+      reason: input.reason ?? "adjustment",
+      audit: false,
+    });
+  } else if (input.delta < 0) {
+    await issueStock(ctx, {
+      productId: input.productId,
+      locationId: input.locationId,
+      qty: -input.delta,
+      reason: input.reason ?? "adjustment",
+      refType: "ADJUSTMENT",
+      allowNegative: true,
+      audit: false,
+    });
+  }
   await recordAudit(ctx, {
     action: "inventory.adjust",
     entityType: "product",

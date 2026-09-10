@@ -1,10 +1,12 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ArrowLeft, BookOpen, Settings } from "lucide-react";
-import { listDocs } from "@/lib/docs/content";
+import type { DocNav } from "@/lib/docs/types";
 import { UserMenu } from "@/components/user-menu";
+import { OrgSwitcher } from "@/components/org-switcher";
 import { DemoResetNotice } from "@/components/demo-reset-notice";
 import {
   ALL_MAIN,
@@ -71,13 +73,26 @@ function BackHeader({ label }: { label: string }) {
 }
 
 export function Sidebar({
+  orgName,
   userName,
   userEmail,
+  docsNav,
+  mobileOpen = false,
+  onMobileClose = () => {},
 }: {
+  orgName: string;
   userName: string;
   userEmail: string;
+  docsNav: DocNav[];
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 }) {
   const pathname = usePathname();
+  // Close the mobile drawer once a navigation commits.
+  useEffect(() => {
+    onMobileClose();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
   const context = pathname.startsWith("/settings")
     ? "settings"
     : pathname.startsWith("/docs")
@@ -88,11 +103,23 @@ export function Sidebar({
   const mainActive = activeHref(pathname, ALL_MAIN);
 
   return (
-    <aside
-      className="flex w-64 shrink-0 flex-col border-r"
-      style={{ background: "var(--color-surface)" }}
-    >
-      <nav className="flex-1 overflow-y-auto px-3 py-3">
+    <>
+      {/* Mobile-only backdrop behind the drawer. */}
+      <div
+        className={`fixed inset-0 z-40 bg-black/50 md:hidden ${mobileOpen ? "" : "hidden"}`}
+        onClick={onMobileClose}
+        aria-hidden
+      />
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex w-64 shrink-0 flex-col border-r shadow-xl transition-transform md:static md:z-auto md:translate-x-0 md:shadow-none ${
+          mobileOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+        style={{ background: "var(--color-surface)" }}
+      >
+        <div className="flex h-14 shrink-0 items-center border-b px-2">
+          <OrgSwitcher initialName={orgName} />
+        </div>
+        <nav className="flex-1 overflow-y-auto px-3 py-3">
         <div key={context} className="nav-swap space-y-4">
           {context === "settings" && (
             <div className="space-y-0.5">
@@ -132,7 +159,7 @@ export function Sidebar({
                   </Link>
                 );
               };
-              const all = listDocs();
+              const all = docsNav;
               // Two tiers, clearly divided: the PRODUCT docs (what you'd write
               // for a real product) render as one flat list on top, and the
               // ENGINEERING / take-home write-ups (how it's built + the "above
@@ -202,10 +229,11 @@ export function Sidebar({
         </div>
       </nav>
 
-      <div className="border-t p-2">
-        <DemoResetNotice variant="pill" />
-        <UserMenu userName={userName} userEmail={userEmail} />
-      </div>
-    </aside>
+        <div className="border-t p-2">
+          <DemoResetNotice variant="pill" />
+          <UserMenu userName={userName} userEmail={userEmail} />
+        </div>
+      </aside>
+    </>
   );
 }

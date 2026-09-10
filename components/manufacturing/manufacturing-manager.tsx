@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Factory, Plus, Tag } from "lucide-react";
+import { AlertTriangle, CalendarClock, Factory, Lock, Plus, Tag, User } from "lucide-react";
 
 export type AssemblyRow = {
   id: string;
@@ -11,6 +11,12 @@ export type AssemblyRow = {
   status: string;
   inputCount: number;
   createdAt: string;
+  scheduledStart: string | null;
+  scheduledEnd: string | null;
+  estimatedWorkMinutes: number | null;
+  assignedTo: string | null;
+  isReserved: boolean;
+  hasShortfall: boolean;
 };
 export type CostRow = {
   id: string;
@@ -28,6 +34,16 @@ const shortDate = (iso: string) =>
     day: "numeric",
     year: "numeric",
   });
+const dayHeading = (iso: string) =>
+  new Date(iso).toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+const timeOfDay = (iso: string) =>
+  new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+const dayKey = (iso: string) => new Date(iso).toISOString().slice(0, 10);
 
 const STATUS_BADGE: Record<string, string> = {
   PENDING: "text-muted",
@@ -45,16 +61,32 @@ export function ManufacturingManager({
   costs: CostRow[];
   costTypes: CostTypeRow[];
 }) {
-  const [tab, setTab] = useState<"assemblies" | "costs">("assemblies");
+  const [tab, setTab] = useState<"assemblies" | "schedule" | "costs">("assemblies");
 
   const inProgress = assemblies.filter((a) => a.status === "IN_PROGRESS").length;
 
+  // Upcoming planned/in-progress runs with a scheduled start, soonest first,
+  // grouped by calendar day for the schedule view.
+  const scheduled = assemblies
+    .filter((a) => a.scheduledStart && (a.status === "PENDING" || a.status === "IN_PROGRESS"))
+    .sort(
+      (a, b) => new Date(a.scheduledStart!).getTime() - new Date(b.scheduledStart!).getTime(),
+    );
+  const scheduledDays: { key: string; iso: string; runs: AssemblyRow[] }[] = [];
+  for (const a of scheduled) {
+    const key = dayKey(a.scheduledStart!);
+    const bucket = scheduledDays.find((d) => d.key === key);
+    if (bucket) bucket.runs.push(a);
+    else scheduledDays.push({ key, iso: a.scheduledStart!, runs: [a] });
+  }
+
   return (
     <div>
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
           ["Assemblies", assemblies.length],
           ["In progress", inProgress],
+          ["Scheduled", scheduled.length],
           ["Cost types", costTypes.length],
         ].map(([label, value]) => (
           <div key={label} className="card">
@@ -71,7 +103,7 @@ export function ManufacturingManager({
           className="flex rounded-lg border p-0.5"
           style={{ background: "var(--color-surface)" }}
         >
-          {(["assemblies", "costs"] as const).map((t) => (
+          {(["assemblies", "schedule", "costs"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -91,7 +123,7 @@ export function ManufacturingManager({
         </Link>
       </div>
 
-      {tab === "assemblies" ? (
+      {tab === "assemblies" && (
         <div className="overflow-x-auto rounded-xl border">
           <table className="w-full min-w-160 text-sm">
             <thead>
@@ -123,10 +155,22 @@ export function ManufacturingManager({
                   </td>
                   <td className="px-4 py-2.5">{a.outputProduct ?? "-"}</td>
                   <td className="px-4 py-2.5">
-                    <span
-                      className={`badge text-[10px] ${STATUS_BADGE[a.status] ?? ""}`}
-                    >
-                      {a.status}
+                    <span className="inline-flex items-center gap-1.5">
+                      <span
+                        className={`badge text-[10px] ${STATUS_BADGE[a.status] ?? ""}`}
+                      >
+                        {a.status}
+                      </span>
+                      {a.isReserved && (
+                        <Lock size={12} className="text-info" aria-label="Inputs reserved" />
+                      )}
+                      {a.hasShortfall && (
+                        <AlertTriangle
+                          size={12}
+                          className="text-danger"
+                          aria-label="Inputs exceed available stock"
+                        />
+                      )}
                     </span>
                   </td>
                   <td className="px-4 py-2.5 text-right tabular-nums">
@@ -148,7 +192,76 @@ export function ManufacturingManager({
             </tbody>
           </table>
         </div>
-      ) : (
+      )}
+
+      {tab === "schedule" && (
+        <div className="space-y-5">
+          {scheduledDays.length === 0 ? (
+            <div className="rounded-xl border px-4 py-10 text-center text-sm text-muted">
+              No scheduled runs. Give an assembly a planned start date to see it
+              on the production schedule.
+            </div>
+          ) : (
+            scheduledDays.map((day) => (
+              <div key={day.key}>
+                <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
+                  <CalendarClock size={15} className="text-muted" />
+                  {dayHeading(day.iso)}
+                  <span className="text-xs font-normal text-muted">
+                    ({day.runs.length})
+                  </span>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {day.runs.map((a) => (
+                    <Link
+                      key={a.id}
+                      href={`/manufacturing/${a.id}`}
+                      className="card block transition-colors hover:border-info/50"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono text-xs text-info">
+                          {a.assemblyNumber}
+                        </span>
+                        <span
+                          className={`badge text-[10px] ${STATUS_BADGE[a.status] ?? ""}`}
+                        >
+                          {a.status}
+                        </span>
+                      </div>
+                      <div className="mt-1.5 truncate text-sm font-medium">
+                        {a.outputProduct ?? "-"}
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+                        <span>{timeOfDay(a.scheduledStart!)}</span>
+                        {a.estimatedWorkMinutes != null && (
+                          <span>~{a.estimatedWorkMinutes} min</span>
+                        )}
+                        {a.assignedTo && (
+                          <span className="inline-flex items-center gap-1">
+                            <User size={11} /> {a.assignedTo}
+                          </span>
+                        )}
+                        {a.isReserved && (
+                          <span className="inline-flex items-center gap-1 text-info">
+                            <Lock size={11} /> reserved
+                          </span>
+                        )}
+                      </div>
+                      {a.hasShortfall && (
+                        <div className="mt-2 inline-flex items-center gap-1 text-xs text-danger">
+                          <AlertTriangle size={12} /> Inputs exceed available stock
+                        </div>
+                      )}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {tab === "costs" && (
         <div className="grid gap-4 lg:grid-cols-3">
           <div className="overflow-x-auto rounded-xl border lg:col-span-2">
             <table className="w-full min-w-120 text-sm">

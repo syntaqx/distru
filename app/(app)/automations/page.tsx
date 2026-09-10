@@ -33,7 +33,7 @@ export default async function AutomationsPage() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <header className="border-b px-6 py-4">
+      <header className="border-b px-4 py-4 sm:px-6">
         <h1 className="text-lg font-semibold">Automations</h1>
         <p className="text-sm text-muted">
           Build workflows as a node graph - triggers, AI agents with their own tools, conditions, and

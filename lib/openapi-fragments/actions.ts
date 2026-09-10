@@ -187,31 +187,68 @@ export const paths: Record<string, unknown> = {
 
   "/public/v1/products/add-costs": echoAction(
     "Add product costs",
-    "Attach cost entries to products. Accepted and echoed; full processing is deferred in this clone.",
+    "Allocate landed costs (`costs[]` of quantity × cost_per_unit) onto a product's open FIFO lots, raising cost basis / COGS. Identify by `product_id` or `sku`.",
   ),
   "/public/v1/packages/add-costs": echoAction(
     "Add package costs",
-    "Attach cost entries to packages. Accepted and echoed; full processing is deferred in this clone.",
+    "Allocate landed costs onto the package's product lots (raising cost basis / COGS). Identify by `package_id` or `package_tag`.",
   ),
   "/public/v1/batches/add-costs": echoAction(
     "Add batch costs",
-    "Attach cost entries to batches. Accepted and echoed; full processing is deferred in this clone.",
+    "Allocate landed costs onto the batch's product lots (raising cost basis / COGS). Identify by `batch_id`.",
   ),
-  "/public/v1/packages/finish": echoAction(
-    "Finish packages",
-    "Mark Metrc packages as finished. Accepted and echoed; full processing is deferred in this clone.",
-  ),
-  "/public/v1/packages/move": echoAction(
-    "Move packages",
-    "Move Metrc packages between locations. Accepted and echoed; full processing is deferred in this clone.",
-  ),
+  "/public/v1/packages/finish": {
+    post: {
+      tags: ["Actions"],
+      summary: "Finish a package",
+      description:
+        "Mark a package finished (Metrc's terminal package state), issuing its remaining quantity out of inventory. Identify it by `id` or `package_tag`.",
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: { id: { type: "string" }, package_tag: { type: "string" } },
+            },
+          },
+        },
+      },
+      responses: { ...ok200, "400": ok200["200"], "401": unauthorized, "404": notFound },
+    },
+  },
+  "/public/v1/packages/move": {
+    post: {
+      tags: ["Actions"],
+      summary: "Move a package",
+      description:
+        "Move a package to another location: transfers the package's quantity between locations (cost-preserving, blocking on shortfall) and repoints it. Identify it by `id` or `package_tag`, and the destination by `to_location_id` or `location`.",
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                package_tag: { type: "string" },
+                to_location_id: { type: "string" },
+                location: { type: "string" },
+              },
+            },
+          },
+        },
+      },
+      responses: { ...ok200, "400": ok200["200"], "401": unauthorized, "404": notFound, "422": ok200["200"] },
+    },
+  },
   "/public/v1/assemblies/split_package": echoAction(
     "Split a package",
-    "Split a package into a new one. Accepted and echoed; full processing is deferred in this clone.",
+    "Split a quantity off a package into a new package (repackaging). Identify the source by `package_id` or `package_tag`; pass `quantity` and optional `new_package_tag`.",
   ),
   "/public/v1/assemblies/create_test_sample": echoAction(
     "Create a test sample",
-    "Create a test sample package. Accepted and echoed; full processing is deferred in this clone.",
+    "Pull a test sample off a package into a new `is_test_sample` package, consuming it from sellable stock. Identify the source by `package_id`/`package_tag` and pass `quantity`.",
   ),
 };
 

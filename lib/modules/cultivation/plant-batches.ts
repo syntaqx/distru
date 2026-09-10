@@ -3,9 +3,18 @@ import { plantBatches } from "@/db/schema";
 import type { ServiceCtx } from "@/lib/modules/shared";
 import { datetime, recordAudit } from "@/lib/modules/shared";
 import { and, count, desc, eq } from "drizzle-orm";
+import { logPlantEvent } from "./plant-events";
 
 type Row = typeof plantBatches.$inferSelect;
 export type PlantPhase = "IMMATURE" | "VEGETATIVE" | "FLOWERING" | "HARVESTED" | "DESTROYED";
+
+/** Forward lifecycle for advancing a batch (DESTROYED is a manual terminal). */
+export const PLANT_BATCH_PHASE_ORDER: PlantPhase[] = [
+  "IMMATURE",
+  "VEGETATIVE",
+  "FLOWERING",
+  "HARVESTED",
+];
 
 export async function nextPlantBatchNumber(ctx: ServiceCtx) {
   const [{ value }] = await db
@@ -86,6 +95,51 @@ export async function upsertPlantBatch(ctx: ServiceCtx, input: PlantBatchInput) 
     .returning();
   await recordAudit(ctx, { action: "plant_batch.create", entityType: "plant_batch", entityId: row.id, after: { batchNumber, count: row.count } });
   return { row, created: true };
+}
+
+/**
+ * Advance a plant batch to the next phase in the grow lifecycle
+ * (IMMATURE → VEGETATIVE → FLOWERING → HARVESTED), or to an explicit `to`
+ * phase. Logs a PHASE_CHANGE (or DESTROY) event on the batch's timeline and
+ * mirrors it into the audit trail. Throws if there is no next phase.
+ */
+export async function advancePlantBatchPhase(
+  ctx: ServiceCtx,
+  id: string,
+  to?: PlantPhase,
+) {
+  const before = await getPlantBatch(ctx, id);
+  if (!before) throw new Error("Plant batch not found.");
+  let next: PlantPhase;
+  if (to) {
+    next = to;
+  } else {
+    const idx = PLANT_BATCH_PHASE_ORDER.indexOf(before.phase);
+    if (idx < 0 || idx >= PLANT_BATCH_PHASE_ORDER.length - 1)
+      throw new Error(
+        `Batch ${before.batchNumber} is already ${before.phase}; there is no next phase.`,
+      );
+    next = PLANT_BATCH_PHASE_ORDER[idx + 1];
+  }
+  const [row] = await db
+    .update(plantBatches)
+    .set({ phase: next, updatedAt: new Date() })
+    .where(and(eq(plantBatches.organizationId, ctx.orgId), eq(plantBatches.id, id)))
+    .returning();
+  await recordAudit(ctx, {
+    action: "plant_batch.phase",
+    entityType: "plant_batch",
+    entityId: id,
+    before: { phase: before.phase },
+    after: { phase: next },
+  });
+  await logPlantEvent(ctx, {
+    plantBatchId: id,
+    type: next === "DESTROYED" ? "DESTROY" : "PHASE_CHANGE",
+    note: `${before.phase} → ${next}`,
+    detail: JSON.stringify({ from: before.phase, to: next }),
+  });
+  return row;
 }
 
 export function plantBatchToApi(r: Row) {

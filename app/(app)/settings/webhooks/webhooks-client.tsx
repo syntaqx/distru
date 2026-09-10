@@ -61,13 +61,13 @@ export function WebhooksClient({
       {endpoints.length > 0 && (
         <div className="mt-3 space-y-2">
           {endpoints.map((e) => (
-            <div key={e.id} className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm" style={{ background: "var(--color-surface)" }}>
-              <span className="badge" style={{ color: e.active ? "var(--color-accent)" : "var(--color-muted)" }}>
+            <div key={e.id} className="flex min-w-0 items-center gap-2 rounded-lg border px-3 py-2 text-sm" style={{ background: "var(--color-surface)" }}>
+              <span className="badge shrink-0" style={{ color: e.active ? "var(--color-accent)" : "var(--color-muted)" }}>
                 {e.active ? "active" : "off"}
               </span>
-              <span className="font-mono text-xs">{e.url}</span>
-              <span className="text-xs text-muted">{e.events.join(", ")}</span>
-              <button className="btn btn-danger ml-auto px-2 py-1 text-xs" onClick={() => startTransition(() => deleteWebhookAction(e.id))}>
+              <span className="min-w-0 flex-1 truncate font-mono text-xs">{e.url}</span>
+              <span className="hidden shrink-0 truncate text-xs text-muted sm:inline">{e.events.join(", ")}</span>
+              <button className="btn btn-danger ml-auto shrink-0 px-2 py-1 text-xs" onClick={() => startTransition(() => deleteWebhookAction(e.id))}>
                 <Trash2 size={13} />
               </button>
             </div>

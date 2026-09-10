@@ -14,7 +14,98 @@ const idParam = {
   schema: { type: "string" },
 };
 
+const unauthorized = { $ref: "#/components/responses/Unauthorized" };
+const notFound = { $ref: "#/components/responses/NotFound" };
+const okObject = {
+  "200": {
+    description: "Success.",
+    content: { "application/json": { schema: { type: "object" } } },
+  },
+} as const;
+
 export const paths: Record<string, unknown> = {
+  "/public/v1/transfers": {
+    get: {
+      tags: ["Inventory"],
+      summary: "List stock transfers",
+      description:
+        "Lists multi-location stock transfers (transfer number, from/to location, lines) in the standard Distru list envelope.",
+      responses: { ...okObject, "401": unauthorized },
+    },
+    post: {
+      tags: ["Inventory"],
+      summary: "Create a stock transfer",
+      description:
+        "Creates and executes a stock transfer between two locations. Each line FIFO-issues from the source and re-receives into the destination at the same per-lot cost; a line exceeding on-hand returns 422.",
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: { $ref: "#/components/schemas/CreateTransferRequest" },
+          },
+        },
+      },
+      responses: { ...okObject, "400": okObject["200"], "401": unauthorized },
+    },
+  },
+  "/public/v1/transfers/{id}": {
+    get: {
+      tags: ["Inventory"],
+      summary: "Get a stock transfer",
+      description: "Returns a single stock transfer with its lines by id.",
+      parameters: [{ ...idParam, description: "The transfer id." }],
+      responses: { ...okObject, "401": unauthorized, "404": notFound },
+    },
+  },
+  "/public/v1/transfers/{id}/manifest/pdf": {
+    get: {
+      tags: ["Inventory"],
+      summary: "Transfer manifest PDF",
+      description:
+        "Renders a Metrc-style transfer manifest (shipping/receiving locations + line items) for a stock transfer as a PDF.",
+      parameters: [{ ...idParam, description: "The transfer id." }],
+      responses: {
+        "200": {
+          description: "A PDF document.",
+          content: { "application/pdf": { schema: { type: "string", format: "binary" } } },
+        },
+        "401": unauthorized,
+        "404": notFound,
+      },
+    },
+  },
+  "/public/v1/inventory/lots": {
+    get: {
+      tags: ["Inventory"],
+      summary: "List FIFO cost layers",
+      description:
+        "The FIFO cost layers behind on-hand: lot number, product/location, unit cost, original vs. remaining quantity, source. Filter with product_id, location_id, and open_only (default true).",
+      parameters: [
+        { name: "product_id", in: "query", required: false, schema: { type: "string" } },
+        { name: "location_id", in: "query", required: false, schema: { type: "string" } },
+        { name: "open_only", in: "query", required: false, schema: { type: "boolean" } },
+      ],
+      responses: { ...okObject, "401": unauthorized },
+    },
+  },
+  "/public/v1/inventory/scan": {
+    get: {
+      tags: ["Inventory"],
+      summary: "Scan lookup",
+      description:
+        "Resolves a scanned code (package tag, Metrc tag, barcode, serial number, or product SKU/barcode) to the package or product it identifies, with on-hand.",
+      parameters: [
+        {
+          name: "code",
+          in: "query",
+          required: true,
+          description: "The scanned code.",
+          schema: { type: "string" },
+        },
+      ],
+      responses: { ...okObject, "400": okObject["200"], "401": unauthorized },
+    },
+  },
   "/public/v1/inventory": {
     get: {
       tags: ["Inventory"],
@@ -127,4 +218,25 @@ export const paths: Record<string, unknown> = {
   },
 };
 
-export const schemas: Record<string, unknown> = {};
+export const schemas: Record<string, unknown> = {
+  CreateTransferRequest: {
+    type: "object",
+    required: ["from_location_id", "to_location_id", "lines"],
+    properties: {
+      from_location_id: { type: "string", description: "Source location id." },
+      to_location_id: { type: "string", description: "Destination location id." },
+      notes: { type: "string", nullable: true },
+      lines: {
+        type: "array",
+        items: {
+          type: "object",
+          required: ["product_id", "quantity"],
+          properties: {
+            product_id: { type: "string" },
+            quantity: { type: "number" },
+          },
+        },
+      },
+    },
+  },
+};

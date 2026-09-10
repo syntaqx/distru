@@ -57,7 +57,7 @@ export function NotificationsView({ initial }: { initial: NotifLite[] }) {
   }
 
   return (
-    <div className="mx-auto flex h-full max-w-3xl flex-col px-6 py-5">
+    <div className="mx-auto flex h-full max-w-3xl flex-col px-4 py-5 sm:px-6">
       <div className="mb-3 flex items-center gap-1">
         <button
           onClick={() => setTab("all")}

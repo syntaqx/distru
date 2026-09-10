@@ -23,7 +23,9 @@ export async function POST(req: Request) {
     const { row, created } = await upsertTask(auth.ctx, {
       id: body.id as string | undefined,
       title: body.title as string | undefined,
+      description: (body.description as string) ?? null,
       status: body.status as string | undefined,
+      priority: body.priority as string | undefined,
       assigneeId: (body.assignee_id as string) ?? null,
       dueAt: (body.due_datetime as string) ?? null,
       entityType: (body.entity_type as string) ?? null,

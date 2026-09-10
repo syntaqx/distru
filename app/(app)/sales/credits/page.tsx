@@ -39,13 +39,13 @@ export default async function CreditsPage() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <header className="border-b px-6 py-4">
+      <header className="border-b px-4 py-4 sm:px-6">
         <h1 className="text-lg font-semibold">Sales</h1>
         <p className="text-sm text-muted">
           Customer credits - store credit issued against returns or goodwill.
         </p>
       </header>
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto p-4 sm:p-6">
         <SalesSubnav />
         <CreditsManager credits={credits} customers={customers} />
       </div>

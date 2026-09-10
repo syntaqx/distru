@@ -9,6 +9,7 @@ import * as pdf from "./openapi-fragments/pdf";
 import * as actions from "./openapi-fragments/actions";
 import * as misc from "./openapi-fragments/misc";
 import * as cultivation from "./openapi-fragments/cultivation";
+import * as deliveries from "./openapi-fragments/deliveries";
 
 type Rec = Record<string, unknown>;
 
@@ -19,6 +20,7 @@ export const EXTRA_PATHS: Rec = {
   ...actions.paths,
   ...misc.paths,
   ...cultivation.paths,
+  ...deliveries.paths,
 };
 
 export const EXTRA_SCHEMAS: Rec = {
@@ -28,4 +30,5 @@ export const EXTRA_SCHEMAS: Rec = {
   ...actions.schemas,
   ...misc.schemas,
   ...cultivation.schemas,
+  ...deliveries.schemas,
 };

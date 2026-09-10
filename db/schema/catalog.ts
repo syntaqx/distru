@@ -103,6 +103,30 @@ export const contacts = pgTable(
   (t) => [index("contacts_org_company_idx").on(t.organizationId, t.companyId)],
 );
 
+/**
+ * CRM sales notes / activity log entries pinned to a company. Org-scoped and
+ * attributed to the actor who wrote them (`authorId` mirrors the audit log's
+ * text actor id so system/agent/user authors all fit). These render newest-first
+ * on the company detail timeline alongside that company's recent orders/invoices.
+ */
+export const companyNotes = pgTable(
+  "company_notes",
+  {
+    id: pk(),
+    organizationId: uuid()
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    // Text (not a uuid FK) so "system"/"agent" actors serialize like the audit log.
+    authorId: text("author_id"),
+    body: text().notNull(),
+    ...timestamps(),
+  },
+  (t) => [index("company_notes_org_company_idx").on(t.organizationId, t.companyId)],
+);
+
 export const locations = pgTable(
   "locations",
   {
@@ -199,6 +223,11 @@ export const products = pgTable(
     // Pricing: wholesale unit price + retail MSRP.
     unitPrice: numeric({ precision: 18, scale: 6 }),
     msrp: numeric({ precision: 18, scale: 6 }),
+    // Standard unit cost - the default COGS basis used when receiving stock
+    // without an explicit purchase cost (Distru's `unit_cost`).
+    unitCost: numeric("unit_cost", { precision: 18, scale: 6 }),
+    // Scannable barcode/UPC for the product (distinct from the SKU).
+    barcode: text(),
     netQuantityPerUnit: numeric({ precision: 18, scale: 6 }),
     servingUnitTypeId: uuid().references(() => unitTypes.id, {
       onDelete: "set null",

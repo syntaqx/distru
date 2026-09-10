@@ -6,7 +6,12 @@ import {
   pageOffset,
   requireScope,
 } from "@/lib/public-api";
-import { listLicenses, upsertLicense, licenseToApi } from "@/lib/modules/compliance";
+import {
+  listLicenses,
+  listLicenseTypes,
+  upsertLicense,
+  licenseToApi,
+} from "@/lib/modules/compliance";
 
 export async function GET(req: Request) {
   const auth = await authenticate(req);
@@ -14,8 +19,17 @@ export async function GET(req: Request) {
   const scopeErr = requireScope(auth, "compliance:read");
   if (scopeErr) return scopeErr;
   const offset = pageOffset(req);
-  const { items, total } = await listLicenses(auth.ctx, { limit: PAGE_SIZE, offset });
-  return listEnvelope(req, items.map(licenseToApi), offset, total);
+  const [{ items, total }, types] = await Promise.all([
+    listLicenses(auth.ctx, { limit: PAGE_SIZE, offset }),
+    listLicenseTypes(auth.ctx, { limit: 200 }),
+  ]);
+  const typeName = new Map(types.items.map((t) => [t.id, t.name]));
+  return listEnvelope(
+    req,
+    items.map((l) => licenseToApi(l, l.licenseTypeId ? typeName.get(l.licenseTypeId) : null)),
+    offset,
+    total,
+  );
 }
 
 export async function POST(req: Request) {
@@ -35,7 +49,11 @@ export async function POST(req: Request) {
       licenseTypeId: (body.license_type_id as string) ?? null,
       name: (body.name as string) ?? null,
       state: (body.state as string) ?? null,
-      expiresAt: body.expires_datetime ? new Date(body.expires_datetime as string) : null,
+      ...(typeof body.active === "boolean" ? { active: body.active } : {}),
+      issuedAt: body.issue_datetime ? new Date(body.issue_datetime as string) : null,
+      expiresAt: (body.expiry_datetime ?? body.expires_datetime)
+        ? new Date((body.expiry_datetime ?? body.expires_datetime) as string)
+        : null,
     });
     return Response.json({ data: licenseToApi(row) }, { status: created ? 201 : 200 });
   } catch (err) {

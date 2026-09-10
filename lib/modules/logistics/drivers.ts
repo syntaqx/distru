@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { drivers } from "@/db/schema";
+import { drivers, member } from "@/db/schema";
 import type { ServiceCtx } from "@/lib/modules/shared";
 import { datetime } from "@/lib/modules/shared";
 import { and, asc, count, eq } from "drizzle-orm";
@@ -24,6 +24,41 @@ export async function listDrivers(
   return { items, total: Number(total), limit, offset };
 }
 
+/**
+ * Drivers joined to the person (org member) behind each one, for the dispatch
+ * directory: clicking a driver should open their person page, so we surface the
+ * `memberId` when the driver is linked to a login. Distinct from `listDrivers`,
+ * which stays a plain drivers query so the public delivery API is unaffected.
+ */
+export async function listDriverDirectory(ctx: ServiceCtx) {
+  return db
+    .select({
+      id: drivers.id,
+      name: drivers.name,
+      phone: drivers.phone,
+      licenseNumber: drivers.licenseNumber,
+      userId: drivers.userId,
+      memberId: member.id,
+    })
+    .from(drivers)
+    .leftJoin(
+      member,
+      and(eq(member.userId, drivers.userId), eq(member.organizationId, ctx.orgId)),
+    )
+    .where(eq(drivers.organizationId, ctx.orgId))
+    .orderBy(asc(drivers.name));
+}
+
+/** The driver profile linked to a given user in this org, if any. */
+export async function getDriverByUser(ctx: ServiceCtx, userId: string) {
+  const [row] = await db
+    .select()
+    .from(drivers)
+    .where(and(eq(drivers.organizationId, ctx.orgId), eq(drivers.userId, userId)))
+    .limit(1);
+  return row ?? null;
+}
+
 export async function getDriver(ctx: ServiceCtx, id: string) {
   const [row] = await db
     .select()
@@ -36,7 +71,13 @@ export async function getDriver(ctx: ServiceCtx, id: string) {
 /** Sparse upsert: with id updates only the fields sent; without id creates. */
 export async function upsertDriver(
   ctx: ServiceCtx,
-  input: { id?: string; name?: string; phone?: string | null; licenseNumber?: string | null },
+  input: {
+    id?: string;
+    name?: string;
+    phone?: string | null;
+    licenseNumber?: string | null;
+    userId?: string | null;
+  },
 ) {
   if (input.id) {
     const [row] = await db
@@ -45,6 +86,7 @@ export async function upsertDriver(
         ...(input.name != null ? { name: input.name.trim() } : {}),
         ...(input.phone !== undefined ? { phone: input.phone } : {}),
         ...(input.licenseNumber !== undefined ? { licenseNumber: input.licenseNumber } : {}),
+        ...(input.userId !== undefined ? { userId: input.userId } : {}),
         updatedAt: new Date(),
       })
       .where(and(eq(drivers.organizationId, ctx.orgId), eq(drivers.id, input.id)))
@@ -60,6 +102,7 @@ export async function upsertDriver(
       name: input.name.trim(),
       phone: input.phone ?? null,
       licenseNumber: input.licenseNumber ?? null,
+      userId: input.userId ?? null,
     })
     .returning();
   return { row, created: true };

@@ -30,7 +30,7 @@ export function SalesSubnav() {
   }
 
   return (
-    <div className="mb-6">
+    <div className="mb-6 -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
       <div
         className="inline-flex rounded-lg border p-0.5"
         style={{ background: "var(--color-surface)" }}
@@ -41,7 +41,7 @@ export function SalesSubnav() {
             <Link
               key={t.label}
               href={t.href}
-              className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
+              className={`rounded-md px-3 py-1.5 text-sm whitespace-nowrap transition-colors ${
                 active ? "text-fg" : "text-muted hover:text-fg"
               }`}
               style={active ? { background: "var(--color-surface2)" } : undefined}

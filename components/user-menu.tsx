@@ -66,7 +66,7 @@ export function UserMenu({ userName, userEmail }: { userName: string; userEmail:
               onClick={async () => {
                 setOpen(false);
                 await signOut();
-                router.push("/sign-in");
+                router.push("/login");
                 router.refresh();
               }}
             >

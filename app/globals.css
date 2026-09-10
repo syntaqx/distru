@@ -75,6 +75,16 @@ body {
 html {
   color-scheme: light dark;
 }
+/* Pin the UA color-scheme to the *app's* explicit theme, so native controls
+   (number-input spinners, scrollbars, date pickers) match the theme the user
+   chose - not their OS. Without this, forcing light mode on a dark-OS machine
+   left the number-input arrows rendering dark on a light field. */
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
 
 body {
   background: var(--color-bg);
@@ -100,6 +110,42 @@ body {
     opacity: 0.35;
   }
 }
+
+/* Radix Dialog modal: full-viewport dimmed backdrop + a centered panel, both
+   animated on open/close via Radix's data-state. Used by components/ui/dialog. */
+@keyframes modalOverlayIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes modalContentIn {
+  from { opacity: 0; transform: translate(-50%, -48%) scale(0.97); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.55);
+  animation: modalOverlayIn 150ms ease-out;
+}
+.modal-content {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 101;
+  transform: translate(-50%, -50%);
+  width: calc(100vw - 2rem);
+  max-height: calc(100dvh - 2rem);
+  overflow: hidden auto;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface);
+  box-shadow: 0 20px 60px -12px rgba(0, 0, 0, 0.4);
+  animation: modalContentIn 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.modal-content:focus { outline: none; }
 
 /* Vercel-style sidebar context swap: light fade + slight slide. */
 @keyframes navIn {
@@ -145,6 +191,24 @@ body {
 }
 .copilot-md [data-streamdown="table-header-cell"] {
   color: var(--color-fg) !important;
+}
+
+/* Docs tables should just fit and wrap - no horizontal scroll (the chat/AI
+   views keep Streamdown's scroll; `.docs-md` is only on the docs Article). The
+   usual reason a table overflows is a long arrow-joined token like
+   "inventory->sales->purchasing" with no spaces to break at, so we let cells
+   break anywhere; the table then sizes to the container width. We leave the
+   wrapper's own overflow alone so it still contains anything genuinely too wide
+   rather than bleeding past the card. */
+/* Docs use the full wide container - prose, tables, code, and diagrams all span
+   the width so nothing feels cramped. */
+.docs-md [data-streamdown="table"] {
+  width: 100%;
+}
+.docs-md [data-streamdown="table-cell"],
+.docs-md [data-streamdown="table-header-cell"] {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 /* Server-highlighted (shiki) code blocks in docs. Light colors are inline from
@@ -196,6 +260,37 @@ body {
 .copilot-md .doc-mermaid svg {
   max-width: 100%;
   height: auto;
+}
+
+/* Inline mermaid failure - shown in place of the diagram (never escapes into the
+   page body), with the source so it's obvious which diagram to fix. */
+.doc-mermaid-error {
+  border: 1px solid color-mix(in oklab, var(--color-danger) 45%, var(--color-border));
+  border-radius: 12px;
+  overflow: hidden;
+  background: color-mix(in oklab, var(--color-danger) 6%, transparent);
+}
+.doc-mermaid-error-head {
+  padding: 0.6rem 0.9rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-danger);
+  border-bottom: 1px solid color-mix(in oklab, var(--color-danger) 30%, var(--color-border));
+}
+.doc-mermaid-error-msg {
+  padding: 0.5rem 0.9rem 0;
+  font-size: 0.78rem;
+  color: var(--color-danger);
+  white-space: pre-wrap;
+  font-family: var(--font-mono), ui-monospace, monospace;
+}
+.doc-mermaid-error pre {
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+  overflow-x: auto;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  color: var(--color-fg);
 }
 
 * {
@@ -335,4 +430,24 @@ body {
 }
 .react-flow__controls-button svg {
   fill: currentColor;
+}
+
+/* MapLibre (Fleet dispatch map): guarantee the canvas + its container fill the
+   map element and stack correctly, even if the vendored stylesheet loads late or
+   isn't applied by the bundler - otherwise the WebGL canvas collapses and the map
+   reads as blank despite tiles loading. Mirrors the essential vendor rules. */
+.maplibregl-map {
+  position: relative;
+  overflow: hidden;
+}
+.maplibregl-canvas-container {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.maplibregl-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
 }

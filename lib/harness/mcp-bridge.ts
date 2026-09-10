@@ -3,12 +3,21 @@ import type { ServiceCtx } from "@/lib/modules/shared";
 import type { AgentContext, HarnessTool, ToolResult } from "./tool";
 import { catalogTools } from "./tools/catalog";
 import { mutationTools } from "./tools/mutations";
+import { inventoryTools } from "./tools/inventory";
 import { salesTools } from "./tools/sales";
 import { analyticsTools } from "./tools/analytics";
+import { reportTools } from "./tools/reports";
 import { cultivationTools } from "./tools/cultivation";
 import { purchasingTools } from "./tools/purchasing";
 import { manufacturingTools } from "./tools/manufacturing";
+import { schedulingTools } from "./tools/scheduling";
 import { complianceTools } from "./tools/compliance";
+import { growTools } from "./tools/grow";
+import { logisticsTools } from "./tools/logistics";
+import { dispatchTools } from "./tools/dispatch";
+import { crmTools } from "./tools/crm";
+import { taskTools } from "./tools/tasks";
+import { integrationTools } from "./tools/integrations";
 
 /**
  * The MCP bridge: exposes the SAME harness tools the built-in Copilot uses to an
@@ -20,19 +29,29 @@ import { complianceTools } from "./tools/compliance";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyTool = HarnessTool<any>;
 
-// The domain capabilities offered to external agents. The read + catalog + sales
-// + analytics tools; internal-only tools (docs search, the import job pipeline,
-// automation management) stay off the external surface because they need
+// The domain capabilities offered to external agents - the full operational
+// surface across every module, mirroring (and exceeding) Distru's own MCP.
+// Internal-only tools (docs search, the import job pipeline, automation/workflow
+// management, ask_user) stay off the external surface because they need
 // chat/session state.
 const EXPOSED: AnyTool[] = [
   ...catalogTools,
   ...mutationTools,
+  ...inventoryTools,
   ...salesTools,
   ...analyticsTools,
+  ...reportTools,
   ...cultivationTools,
   ...purchasingTools,
   ...manufacturingTools,
+  ...schedulingTools,
   ...complianceTools,
+  ...growTools,
+  ...logisticsTools,
+  ...dispatchTools,
+  ...crmTools,
+  ...taskTools,
+  ...integrationTools,
 ];
 
 /** Harness tool name (`create_order`) → Distru MCP tool name (`distru-create-order`). */

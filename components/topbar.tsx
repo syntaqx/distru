@@ -111,8 +111,8 @@ export function TopBar({
   }
 
   return (
-    <div className="relative z-20 flex flex-1 items-center gap-3 px-4">
-      <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-sm">
+    <div className="relative z-20 flex flex-1 items-center gap-2 px-2 sm:gap-3 sm:px-4">
+      <nav aria-label="Breadcrumb" className="hidden items-center gap-1 text-sm sm:flex">
         {crumbs.map((c, i) => {
           const last = i === crumbs.length - 1;
           return (
@@ -143,9 +143,9 @@ export function TopBar({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search products…"
-          className="input py-1.5 pl-9 pr-12 text-sm"
+          className="input py-1.5 pl-9 pr-3 text-sm sm:pr-12"
         />
-        <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 rounded border px-1.5 py-0.5 text-[10px] text-muted">
+        <span className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border px-1.5 py-0.5 text-[10px] text-muted sm:block">
           ⌘K
         </span>
       </form>
@@ -178,17 +178,18 @@ export function TopBar({
             : { background: "var(--color-surface2)", color: "var(--color-fg)" }
         }
         title="Toggle Copilot (⌘/Ctrl+J)"
+        aria-label="Toggle Copilot"
       >
         <Sparkles size={16} />
-        Copilot
-        <span className="text-[11px] opacity-70">⌘J</span>
+        <span className="hidden sm:inline">Copilot</span>
+        <span className="hidden text-[11px] opacity-70 sm:inline">⌘J</span>
       </button>
 
       {bell && (
         <>
           <button className="fixed inset-0 z-10 cursor-default" aria-hidden onClick={() => setBell(false)} />
           <div
-            className="absolute right-3 top-full z-20 mt-1 flex max-h-[70vh] w-80 flex-col overflow-hidden rounded-xl border shadow-lg"
+            className="absolute right-3 top-full z-20 mt-1 flex max-h-[70vh] w-80 max-w-[calc(100vw-1.5rem)] flex-col overflow-hidden rounded-xl border shadow-lg"
             style={{ background: "var(--color-surface)" }}
           >
             <div className="flex items-center justify-between border-b px-3 py-2">

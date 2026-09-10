@@ -136,11 +136,11 @@ export function SalesManager({
           <div className="mb-3 flex items-center gap-2 text-xs uppercase tracking-wide text-muted">
             <TrendingUp size={14} /> Top sellers
           </div>
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 overflow-x-auto">
             {topSellers.map((p, idx) => {
               const max = topSellers[0]?.revenue || 1;
               return (
-                <div key={p.sku} className="flex items-center gap-3 text-sm">
+                <div key={p.sku} className="flex min-w-120 items-center gap-3 text-sm">
                   <span className="w-4 text-right tabular-nums text-muted">
                     {idx + 1}
                   </span>

@@ -73,8 +73,8 @@ export function TokensClient({
       </div>
 
       {tokens.length > 0 && (
-        <div className="mt-3 overflow-hidden rounded-xl border">
-          <table className="w-full text-sm">
+        <div className="mt-3 overflow-x-auto rounded-xl border">
+          <table className="w-full min-w-160 text-sm">
             <thead>
               <tr className="text-left text-muted" style={{ background: "var(--color-surface)" }}>
                 <th className="px-4 py-2 font-medium">Name</th>

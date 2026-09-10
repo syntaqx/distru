@@ -13,7 +13,7 @@ export default async function NewBatchPage() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto p-4 sm:p-6">
         <BatchForm
           initial={{ batchNumber: "", productId: "" }}
           products={products.map((p) => ({ id: p.product.id, name: p.product.name }))}

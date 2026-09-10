@@ -37,7 +37,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <header className="flex items-center justify-between border-b px-6 py-4">
+      <header className="flex items-center justify-between border-b px-4 py-4 sm:px-6">
         <div className="flex items-center gap-3">
           <Link href="/inventory" className="btn btn-ghost px-2" title="Back to inventory" aria-label="Back to inventory">
             <ArrowLeft size={16} />
@@ -56,7 +56,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
         </Link>
       </header>
 
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto p-4 sm:p-6">
         <div className="mx-auto grid max-w-4xl gap-6 lg:grid-cols-3">
           {/* Images + on-hand */}
           <div className="space-y-4">

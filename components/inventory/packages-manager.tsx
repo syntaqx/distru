@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { InventorySubnav } from "@/components/inventory/inventory-subnav";
+import { ScanBox } from "@/components/inventory/scan-box";
 
 export type PackageRowView = {
   id: string;
@@ -27,6 +28,8 @@ export function PackagesManager({ packages }: { packages: PackageRowView[] }) {
   return (
     <div>
       <InventorySubnav />
+
+      <ScanBox />
 
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
         {[

@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { companies, locations, purchaseOrderItems, purchaseOrders } from "@/db/schema";
 import type { ServiceCtx } from "@/lib/modules/shared";
 import { recordAudit, datetime, num, ref, assertPositiveQuantities } from "@/lib/modules/shared";
-import { adjustInventory } from "@/lib/modules/inventory";
+import { issueStock, receiveStock } from "@/lib/modules/inventory";
 import { getDefaultLocation } from "@/lib/modules/catalog";
 
 export type PurchaseOrderStatus = "DRAFT" | "OPEN" | "RECEIVED" | "CANCELED";
@@ -58,7 +58,12 @@ export async function nextPoNumber(ctx: ServiceCtx) {
   return `PO-${String(Number(value) + 1).padStart(4, "0")}`;
 }
 
-/** Post (receive, +1) or reverse (-1) stock for every line at the PO's location. */
+/**
+ * Post (receive, +1) or reverse (-1) stock for every line at the PO's location.
+ * A receipt opens a FIFO cost layer at the PO line's actual unit cost, so what
+ * you paid the vendor is what later flows through as COGS. Reversing a receipt
+ * issues that stock back out.
+ */
 async function moveStock(
   ctx: ServiceCtx,
   po: PurchaseOrderRow,
@@ -68,14 +73,29 @@ async function moveStock(
   const locationId = po.locationId ?? (await getDefaultLocation(ctx)).id;
   for (const item of items) {
     if (!item.productId) continue;
-    const qty = Number(item.quantity) * direction;
+    const qty = Number(item.quantity);
     if (qty === 0) continue;
-    await adjustInventory(ctx, {
-      productId: item.productId,
-      locationId,
-      delta: qty,
-      reason: `purchase:${po.poNumber}`,
-    });
+    if (direction === 1) {
+      await receiveStock(ctx, {
+        productId: item.productId,
+        locationId,
+        qty,
+        unitCost: item.unitCost != null ? Number(item.unitCost) : undefined,
+        sourceType: "PURCHASE",
+        sourceId: po.id,
+        reason: `purchase:${po.poNumber}`,
+      });
+    } else {
+      await issueStock(ctx, {
+        productId: item.productId,
+        locationId,
+        qty,
+        reason: `purchase-reversal:${po.poNumber}`,
+        refType: "PURCHASE",
+        refId: po.id,
+        allowNegative: true,
+      });
+    }
   }
 }
 

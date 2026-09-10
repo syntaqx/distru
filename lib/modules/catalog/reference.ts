@@ -4,13 +4,14 @@ import {
   categories,
   companies,
   companyGroups,
+  companyNotes,
   contacts,
   locations,
   products,
   unitTypes,
 } from "@/db/schema";
 import type { ServiceCtx } from "../shared";
-import { recordAudit, customData, datetime } from "../shared";
+import { recordAudit, customData, datetime, num } from "../shared";
 import { getAccountingProvider, getMarketplaceProvider } from "@/lib/integrations/sync";
 
 // ---------------- Unit types (global reference) ----------------
@@ -376,6 +377,76 @@ export async function deleteCompany(ctx: ServiceCtx, id: string) {
   });
 }
 
+// ---------------- Company notes (CRM sales notes / activity) ----------------
+
+export type CompanyNoteRow = typeof companyNotes.$inferSelect;
+
+/** Append a sales note / activity entry to a company's timeline. */
+export async function addCompanyNote(
+  ctx: ServiceCtx,
+  input: { companyId: string; body: string; authorId?: string | null },
+) {
+  const body = input.body?.trim();
+  if (!body) throw new Error("Note body is required.");
+  // Guard: only allow notes on a company that exists in this org.
+  const company = await getCompany(ctx, input.companyId);
+  if (!company) throw new Error("Company not found.");
+  const [row] = await db
+    .insert(companyNotes)
+    .values({
+      organizationId: ctx.orgId,
+      companyId: input.companyId,
+      authorId: input.authorId ?? ctx.actor,
+      body,
+    })
+    .returning();
+  await recordAudit(ctx, {
+    action: "company_note.create",
+    entityType: "company",
+    entityId: input.companyId,
+    after: { noteId: row.id, body },
+  });
+  return row;
+}
+
+/** A company's notes, newest first. */
+export async function listCompanyNotes(
+  ctx: ServiceCtx,
+  companyId: string,
+  opts: { limit?: number } = {},
+) {
+  const limit = Math.min(Math.max(opts.limit ?? 50, 1), 200);
+  return db
+    .select()
+    .from(companyNotes)
+    .where(
+      and(
+        eq(companyNotes.organizationId, ctx.orgId),
+        eq(companyNotes.companyId, companyId),
+      ),
+    )
+    .orderBy(desc(companyNotes.createdAt))
+    .limit(limit);
+}
+
+export async function deleteCompanyNote(ctx: ServiceCtx, id: string) {
+  await db
+    .delete(companyNotes)
+    .where(and(eq(companyNotes.organizationId, ctx.orgId), eq(companyNotes.id, id)));
+}
+
+export function companyNoteToApi(n: CompanyNoteRow, authorName?: string | null) {
+  return {
+    id: n.id,
+    company: { id: n.companyId },
+    body: n.body,
+    author_id: n.authorId ?? null,
+    author: authorName ?? null,
+    inserted_datetime: datetime(n.createdAt),
+    updated_datetime: datetime(n.updatedAt),
+  };
+}
+
 // ---------------- Locations ----------------
 
 export async function listLocations(ctx: ServiceCtx) {
@@ -600,6 +671,7 @@ function relationshipType(roles: string[]): { id: string; name: string } | null 
 export function companyToApi(
   c: typeof companies.$inferSelect,
   groupName?: string | null,
+  extra?: { outstandingBalance?: number | null; licensesCount?: number | null },
 ) {
   return {
     id: c.id,
@@ -608,6 +680,11 @@ export function companyToApi(
     group: c.groupId ? { id: c.groupId, name: groupName ?? null } : null,
     tags: c.tags ?? [],
     custom_data: customData(c.customFields),
+    // Live CRM signals when the caller supplies them (company detail / AR views);
+    // otherwise null so the serializer stays pure and cheap for list endpoints.
+    outstanding_balance:
+      extra?.outstandingBalance != null ? num(extra.outstandingBalance) : null,
+    licenses_count: extra?.licensesCount ?? null,
     // Distru-parity fields not modeled in this clone (null/empty; see
     // DISTRU-PARITY.md §5 Tier 3).
     legal_business_name: null,
@@ -616,7 +693,6 @@ export function companyToApi(
     category: null,
     licenses: [],
     locations: [],
-    outstanding_balance: null,
     outstanding_balance_threshold: null,
     default_email: null,
     invoice_email: null,

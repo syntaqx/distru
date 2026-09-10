@@ -21,7 +21,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto p-4 sm:p-6">
         <ProductForm
           initial={{
             id: p.product.id,

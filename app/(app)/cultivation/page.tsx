@@ -65,14 +65,14 @@ export default async function CultivationPage() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <header className="border-b px-6 py-4">
+      <header className="border-b px-4 py-4 sm:px-6">
         <h1 className="text-lg font-semibold">Cultivation</h1>
         <p className="text-sm text-muted">
           Track plant batches through their lifecycle, individual plants, and the
           harvests they yield.
         </p>
       </header>
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto p-4 sm:p-6">
         <CultivationManager
           plantBatches={batchRows}
           plants={plantRows}

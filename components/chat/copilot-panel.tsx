@@ -37,6 +37,15 @@ export function CopilotPanel({ open, onClose }: { open: boolean; onClose: () => 
   const [maximized, setMaximized] = useState(false);
   const restore = useRef<Frame | null>(null);
   const gesture = useRef<{ mode: "move" | Dir; sx: number; sy: number; start: Frame } | null>(null);
+  // Reopening starts a fresh chat (like claude.ai): bump a key on each
+  // closed -> open transition so ChatView remounts new instead of continuing the
+  // previous thread. History stays reachable via the History view.
+  const [chatKey, setChatKey] = useState(0);
+  const prevOpen = useRef(open);
+  useEffect(() => {
+    if (open && !prevOpen.current) setChatKey((k) => k + 1);
+    prevOpen.current = open;
+  }, [open]);
 
   // Initial frame: restore a saved one (clamped on-screen), else bottom-right.
   useEffect(() => {
@@ -148,11 +157,13 @@ export function CopilotPanel({ open, onClose }: { open: boolean; onClose: () => 
         bottom: view ? undefined : 24,
         width: view?.w ?? 400,
         height: view?.h ?? 620,
+        maxWidth: "calc(100vw - 16px)",
         maxHeight: "calc(100dvh - 16px)",
         background: "var(--color-surface)",
       }}
     >
       <ChatView
+        key={chatKey}
         compact
         onClose={onClose}
         onHeaderPointerDown={(e) => beginGesture("move", e)}

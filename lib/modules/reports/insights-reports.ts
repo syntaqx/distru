@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { inventoryLedger, locations, products } from "@/db/schema";
 import { datetime, num, type ServiceCtx } from "@/lib/modules/shared";
 import { listProducts } from "@/lib/modules/catalog";
-import { onHandByProduct } from "@/lib/modules/inventory";
+import { inventoryValueByProduct } from "@/lib/modules/inventory";
 import {
   getOrder,
   lineTotal,
@@ -17,6 +17,21 @@ import {
   type OrderStatus,
 } from "@/lib/modules/sales";
 import { getPurchaseOrder, listPurchaseOrders, type PurchaseOrderStatus } from "@/lib/modules/purchasing";
+import {
+  arAgingByCompany,
+  lowStock,
+  marginByProduct,
+  matrixMonths,
+  paymentsByMethod,
+  salesByMonth,
+  salesMatrix,
+} from "./analytics";
+
+/**
+ * Month columns for the sales matrix, fixed at module load so the report's
+ * `columns` (static) and its `run()` rows share identical month keys.
+ */
+const MATRIX_MONTHS = matrixMonths(6);
 
 /**
  * The Insights report registry - the single source of truth for the standard
@@ -289,6 +304,122 @@ export const REPORT_DEFS: ReportDef[] = [
       });
     },
   },
+  {
+    name: "sales-matrix",
+    label: "Sales matrix (units by month)",
+    group: "Sales",
+    scope: "orders:read",
+    columns: [
+      { key: "sku", label: "SKU" },
+      { key: "product", label: "Product" },
+      ...MATRIX_MONTHS.map((m) => ({ key: m.key, label: m.label })),
+      { key: "total", label: "Total" },
+    ],
+    async run(ctx) {
+      const rows = await salesMatrix(ctx, { months: MATRIX_MONTHS, metric: "units" });
+      return rows.map((r) => {
+        const out: ReportRow = { sku: r.sku, product: r.product, total: num(r.total) };
+        for (const m of MATRIX_MONTHS) out[m.key] = num(Number(r[m.key]) || 0);
+        return out;
+      });
+    },
+  },
+  {
+    name: "sales-by-month",
+    label: "Sales by month",
+    group: "Sales",
+    scope: "orders:read",
+    dateField: "order_datetime",
+    columns: [
+      { key: "month", label: "Month" },
+      { key: "order_count", label: "Orders" },
+      { key: "units_sold", label: "Units Sold" },
+      { key: "revenue", label: "Revenue" },
+    ],
+    async run(ctx, o) {
+      const rows = await salesByMonth(ctx, o.from, o.to);
+      return rows.map((r) => ({
+        month: r.month,
+        order_count: String(r.orderCount),
+        units_sold: num(r.unitsSold),
+        revenue: num(r.revenue),
+      }));
+    },
+  },
+  {
+    name: "margin-by-product",
+    label: "Margin by product",
+    group: "Sales",
+    scope: "orders:read",
+    dateField: "order_datetime",
+    columns: [
+      { key: "sku", label: "SKU" },
+      { key: "product", label: "Product" },
+      { key: "quantity_sold", label: "Quantity Sold" },
+      { key: "revenue", label: "Revenue" },
+      { key: "cogs", label: "COGS" },
+      { key: "margin", label: "Gross Margin" },
+      { key: "margin_pct", label: "Margin %" },
+    ],
+    async run(ctx, o) {
+      const rows = await marginByProduct(ctx, o.from, o.to);
+      return rows.map((r) => ({
+        sku: r.sku,
+        product: r.name,
+        quantity_sold: num(r.quantitySold),
+        revenue: num(r.revenue),
+        cogs: num(r.cogs),
+        margin: num(r.margin),
+        margin_pct: num(r.marginPct),
+      }));
+    },
+  },
+  // ---------------- Financials (AR & payments) ----------------
+  {
+    name: "ar-aging",
+    label: "AR aging",
+    group: "Financials",
+    scope: "orders:read",
+    columns: [
+      { key: "company", label: "Company" },
+      { key: "current", label: "0-30 Days" },
+      { key: "d31_60", label: "31-60 Days" },
+      { key: "d61_90", label: "61-90 Days" },
+      { key: "d90_plus", label: "90+ Days" },
+      { key: "total", label: "Total Outstanding" },
+    ],
+    async run(ctx) {
+      const rows = await arAgingByCompany(ctx);
+      return rows.map((r) => ({
+        company: r.company,
+        current: num(r.current),
+        d31_60: num(r.d31_60),
+        d61_90: num(r.d61_90),
+        d90_plus: num(r.d90_plus),
+        total: num(r.total),
+      }));
+    },
+  },
+  {
+    name: "payments-received",
+    label: "Payments received",
+    group: "Financials",
+    scope: "orders:read",
+    dateField: "payment_datetime",
+    columns: [
+      { key: "method", label: "Payment Method" },
+      { key: "payment_count", label: "Payments" },
+      { key: "total", label: "Total Received" },
+    ],
+    async run(ctx, o) {
+      const rows = await paymentsByMethod(ctx, o.from, o.to);
+      return rows.map((r) => ({
+        method: r.method,
+        payment_count: String(r.paymentCount),
+        total: num(r.total),
+      }));
+    },
+  },
   // ---------------- Inventory & COGS ----------------
   {
     name: "cogs",
@@ -307,7 +438,9 @@ export const REPORT_DEFS: ReportDef[] = [
         topProducts(ctx, { limit: 100, by: "quantity" }),
         listProducts(ctx, { limit: 200 }),
       ]);
-      const costBySku = new Map(prods.items.map((p) => [p.product.sku, Number(p.product.unitPrice ?? 0)]));
+      // Cost basis is the product's standard unit cost (Distru's unit_cost), not
+      // its sales price.
+      const costBySku = new Map(prods.items.map((p) => [p.product.sku, Number(p.product.unitCost ?? 0)]));
       return sold.map((r) => {
         const unitCost = costBySku.get(r.sku) ?? 0;
         return {
@@ -329,20 +462,24 @@ export const REPORT_DEFS: ReportDef[] = [
       { key: "sku", label: "SKU" },
       { key: "product", label: "Product" },
       { key: "on_hand", label: "On Hand" },
-      { key: "unit_price", label: "Unit Price" },
+      { key: "unit_cost", label: "Unit Cost" },
       { key: "total_value", label: "Total Value" },
     ],
     async run(ctx) {
-      const [prods, onHand] = await Promise.all([listProducts(ctx, { limit: 200 }), onHandByProduct(ctx)]);
+      // Valued at FIFO cost (SUM of remaining lot qty × lot unit cost), matching
+      // Distru's cost_per_unit_actual - not the sales price.
+      const [prods, value] = await Promise.all([
+        listProducts(ctx, { limit: 200 }),
+        inventoryValueByProduct(ctx),
+      ]);
       return prods.items.map((p) => {
-        const qty = onHand.get(p.product.id) ?? 0;
-        const price = Number(p.product.unitPrice ?? 0);
+        const v = value.get(p.product.id) ?? { qty: 0, value: 0 };
         return {
           sku: p.product.sku,
           product: p.product.name,
-          on_hand: num(qty),
-          unit_price: num(price),
-          total_value: num(qty * price),
+          on_hand: num(v.qty),
+          unit_cost: num(v.qty > 0 ? v.value / v.qty : 0),
+          total_value: num(v.value),
         };
       });
     },
@@ -359,15 +496,19 @@ export const REPORT_DEFS: ReportDef[] = [
       { key: "total_value", label: "Total Value" },
     ],
     async run(ctx) {
-      const [prods, onHand] = await Promise.all([listProducts(ctx, { limit: 200 }), onHandByProduct(ctx)]);
+      // Valued at FIFO cost, bucketed by category.
+      const [prods, value] = await Promise.all([
+        listProducts(ctx, { limit: 200 }),
+        inventoryValueByProduct(ctx),
+      ]);
       const buckets = new Map<string, { count: number; onHand: number; value: number }>();
       for (const p of prods.items) {
         const category = p.category?.name ?? "Uncategorized";
-        const qty = onHand.get(p.product.id) ?? 0;
+        const v = value.get(p.product.id) ?? { qty: 0, value: 0 };
         const b = buckets.get(category) ?? { count: 0, onHand: 0, value: 0 };
         b.count += 1;
-        b.onHand += qty;
-        b.value += qty * Number(p.product.unitPrice ?? 0);
+        b.onHand += v.qty;
+        b.value += v.value;
         buckets.set(category, b);
       }
       return [...buckets.entries()].map(([category, b]) => ({
@@ -417,6 +558,31 @@ export const REPORT_DEFS: ReportDef[] = [
         quantity_delta: num(r.quantityDelta),
         reason: r.reason,
         actor: r.actor,
+      }));
+    },
+  },
+  {
+    name: "low-stock",
+    label: "Low stock / reorder",
+    group: "Inventory & COGS",
+    scope: "inventory:read",
+    columns: [
+      { key: "sku", label: "SKU" },
+      { key: "product", label: "Product" },
+      { key: "category", label: "Category" },
+      { key: "on_hand", label: "On Hand" },
+      { key: "threshold", label: "Reorder Threshold" },
+      { key: "shortfall", label: "Suggested Reorder" },
+    ],
+    async run(ctx) {
+      const rows = await lowStock(ctx);
+      return rows.map((r) => ({
+        sku: r.sku,
+        product: r.name,
+        category: r.category,
+        on_hand: num(r.onHand),
+        threshold: num(r.threshold),
+        shortfall: num(r.shortfall),
       }));
     },
   },

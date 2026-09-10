@@ -2,60 +2,41 @@ name: CI
 
 on:
   push:
-    branches: [main]
   pull_request:
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: distru
-          POSTGRES_PASSWORD: distru
-          POSTGRES_DB: distru
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U distru -d distru"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-
-    env:
-      DATABASE_URL: postgres://distru:distru@localhost:5432/distru
-      BETTER_AUTH_SECRET: ci-secret-not-used-in-production-0000000000
-      BETTER_AUTH_URL: http://localhost:3000
-      APP_URL: http://localhost:3000
-
     steps:
-      - uses: actions/checkout@v7
+      - name: Checkout
+        uses: actions/checkout@v5
 
-      - name: Use Node.js from .nvmrc
+      - name: Set up Node
         uses: actions/setup-node@v7
         with:
-          node-version-file: .nvmrc
+          node-version: 24
           cache: npm
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Typecheck
-        run: npm run typecheck
-
       - name: Lint
         run: npm run lint
 
-      - name: Build
-        run: npm run build
+      - name: Typecheck
+        run: npx tsc --noEmit
 
-      - name: Push schema
-        run: npm run db:push
+      - name: Build docs
+        run: npm run build:docs
 
-      - name: Seed demo tenant
-        run: npm run db:seed
+      - name: Check OpenAPI
+        run: npm run check:openapi
 
-      - name: Smoke test (services + import pipeline)
-        run: npm run smoke
+      - name: Test with coverage
+        run: npm run test:coverage
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}

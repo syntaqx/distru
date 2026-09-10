@@ -65,7 +65,7 @@ const ACTIVE = [
   { href: "/manufacturing", label: "Manufacturing", desc: "Assemblies, BOMs & COGS", Icon: Factory },
   { href: "/compliance", label: "Compliance", desc: "Licenses, COAs & Metrc", Icon: ShieldCheck },
   { href: "/cultivation", label: "Cultivation", desc: "Plants, harvests & lifecycle", Icon: Sprout },
-  { href: "/fleet", label: "Fleet", desc: "Drivers & vehicles", Icon: Car },
+  { href: "/fleet", label: "Fleet", desc: "Dispatch map, deliveries & drivers", Icon: Car },
   { href: "/insights", label: "Insights", desc: "Reporting & analytics", Icon: LineChart },
 ];
 
@@ -74,6 +74,9 @@ function actionLabel(action: string) {
     "product.create": "Created product",
     "product.update": "Updated product",
     "inventory.adjust": "Adjusted inventory",
+    "inventory.receive": "Received stock",
+    "inventory.issue": "Issued stock",
+    "inventory.transfer": "Transferred stock",
     "category.create": "Created category",
     "company.create": "Created company",
     "order.create": "Created order",
@@ -120,7 +123,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="h-full overflow-auto">
-      <div className="mx-auto max-w-5xl px-6 py-8">
+      <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
         <CopilotHero firstName={firstName} />
 
         <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -158,16 +161,16 @@ export default async function DashboardPage() {
           {audit.map((a) => (
             <div
               key={a.id}
-              className="flex items-center gap-3 px-4 py-2.5 text-sm"
+              className="flex min-w-0 items-center gap-3 px-4 py-2.5 text-sm"
             >
-              <span className="badge text-[10px]">{a.actorType}</span>
-              <span className="font-medium">{actionLabel(a.action)}</span>
-              <span className="text-muted">
+              <span className="badge shrink-0 text-[10px]">{a.actorType}</span>
+              <span className="shrink-0 font-medium">{actionLabel(a.action)}</span>
+              <span className="min-w-0 flex-1 truncate text-muted">
                 {(a.after as { name?: string; sku?: string } | null)?.name ??
                   (a.after as { sku?: string } | null)?.sku ??
                   a.entityType}
               </span>
-              <span className="ml-auto text-xs text-muted">
+              <span className="ml-auto shrink-0 text-xs text-muted">
                 {timeAgo(a.createdAt)}
               </span>
             </div>

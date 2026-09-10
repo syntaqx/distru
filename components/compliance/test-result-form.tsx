@@ -17,14 +17,17 @@ const RESULTS = ["PASS", "FAIL", "PENDING"] as const;
 export function TestResultForm({
   initial,
   products,
+  packages = [],
 }: {
   initial: TestResultFormData;
   products: Option[];
+  packages?: Option[];
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [form, setForm] = useState<TestResultFormData>(initial);
   const [error, setError] = useState<string | null>(null);
+  const editing = Boolean(initial.id);
 
   const set = <K extends keyof TestResultFormData>(
     k: K,
@@ -35,7 +38,7 @@ export function TestResultForm({
     setError(null);
     startTransition(async () => {
       const res = await saveTestResultAction(form);
-      if (res.ok) router.push("/compliance");
+      if (res.ok) router.push(res.id ? `/compliance/test-results/${res.id}` : "/compliance");
       else setError(res.error ?? "Could not save COA.");
     });
   }
@@ -46,9 +49,10 @@ export function TestResultForm({
     <div className="mx-auto max-w-3xl">
       <div className="mb-5 flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold">New COA</h1>
+          <h1 className="text-lg font-semibold">{editing ? "Edit COA" : "New COA"}</h1>
           <p className="text-sm text-muted">
-            Record a certificate of analysis / lab test result for a product.
+            Record a certificate of analysis / lab test result, with structured
+            potency and an optional package link for lot-level traceability.
           </p>
         </div>
         <Link href="/compliance" className="btn btn-ghost">
@@ -63,8 +67,8 @@ export function TestResultForm({
       )}
 
       <section className="card">
-        <div className="grid grid-cols-2 gap-3">
-          <div className="col-span-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
             <label className={label}>Product</label>
             <Select
               ariaLabel="Product"
@@ -74,6 +78,19 @@ export function TestResultForm({
               options={[
                 { value: "", label: "No product" },
                 ...products.map((p) => ({ value: p.id, label: p.name })),
+              ]}
+            />
+          </div>
+          <div>
+            <label className={label}>Package (lot-level)</label>
+            <Select
+              ariaLabel="Package"
+              value={form.packageId ?? ""}
+              onValueChange={(v) => set("packageId", v)}
+              placeholder="No package"
+              options={[
+                { value: "", label: "No package" },
+                ...packages.map((p) => ({ value: p.id, label: p.name })),
               ]}
             />
           </div>
@@ -99,7 +116,76 @@ export function TestResultForm({
               onChange={(e) => set("testedAt", e.target.value)}
             />
           </div>
-          <div className="col-span-2">
+        </div>
+      </section>
+
+      <section className="card mt-4">
+        <h2 className="mb-3 text-sm font-semibold">Potency</h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div>
+            <label className={label}>THC %</label>
+            <input
+              type="number"
+              step="0.01"
+              className="input"
+              value={form.thcPercentage ?? ""}
+              onChange={(e) => set("thcPercentage", e.target.value)}
+            />
+          </div>
+          <div>
+            <label className={label}>CBD %</label>
+            <input
+              type="number"
+              step="0.01"
+              className="input"
+              value={form.cbdPercentage ?? ""}
+              onChange={(e) => set("cbdPercentage", e.target.value)}
+            />
+          </div>
+          <div>
+            <label className={label}>THC mg/unit</label>
+            <input
+              type="number"
+              step="0.01"
+              className="input"
+              value={form.thcMgPerUnit ?? ""}
+              onChange={(e) => set("thcMgPerUnit", e.target.value)}
+            />
+          </div>
+          <div>
+            <label className={label}>CBD mg/unit</label>
+            <input
+              type="number"
+              step="0.01"
+              className="input"
+              value={form.cbdMgPerUnit ?? ""}
+              onChange={(e) => set("cbdMgPerUnit", e.target.value)}
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className="card mt-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label className={label}>Metrc lab test id</label>
+            <input
+              className="input"
+              value={form.metrcLabTestId ?? ""}
+              placeholder="LT-00000"
+              onChange={(e) => set("metrcLabTestId", e.target.value)}
+            />
+          </div>
+          <div>
+            <label className={label}>COA document URL</label>
+            <input
+              className="input"
+              value={form.coaUrl ?? ""}
+              placeholder="https://…"
+              onChange={(e) => set("coaUrl", e.target.value)}
+            />
+          </div>
+          <div className="sm:col-span-2">
             <label className={label}>Notes</label>
             <textarea
               className="input min-h-24"
@@ -116,7 +202,7 @@ export function TestResultForm({
           Cancel
         </Link>
         <button className="btn btn-primary" onClick={save} disabled={pending}>
-          {pending ? "Saving…" : "Create COA"}
+          {pending ? "Saving…" : editing ? "Save COA" : "Create COA"}
         </button>
       </div>
     </div>

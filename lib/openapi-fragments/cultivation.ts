@@ -2,6 +2,7 @@
 
 const PHASE_ENUM = ["IMMATURE", "VEGETATIVE", "FLOWERING", "HARVESTED", "DESTROYED"];
 const STATUS_ENUM = ["ACTIVE", "FINISHED"];
+const EVENT_TYPE_ENUM = ["MOVE", "FEED", "PHASE_CHANGE", "DESTROY", "HARVEST", "NOTE"];
 
 /** A nullable `{ id }` reference stub, as emitted by the *ToApi mappers. */
 const idRef = (description: string) => ({
@@ -163,6 +164,48 @@ export const paths: Record<string, unknown> = {
       responses: detailResponses("HarvestEnvelope", "The harvest."),
     },
   },
+  "/public/v1/plant-events": {
+    get: {
+      tags: ["Cultivation"],
+      summary: "List plant lifecycle events",
+      description:
+        "The lifecycle event timeline (moves, feedings, phase changes, destroys, harvests, notes), most recent first. Filter to one subject with `plant_id` and/or `plant_batch_id`.",
+      parameters: [
+        ...pageParams,
+        {
+          name: "plant_id",
+          in: "query",
+          schema: { type: "string", format: "uuid" },
+          description: "Only events for this plant.",
+        },
+        {
+          name: "plant_batch_id",
+          in: "query",
+          schema: { type: "string", format: "uuid" },
+          description: "Only events for this plant batch.",
+        },
+      ],
+      responses: listResponse("PlantEventList", "A page of plant events."),
+    },
+    post: {
+      tags: ["Cultivation"],
+      summary: "Log a plant lifecycle event",
+      description:
+        "Append an event to a plant or plant batch. Exactly one of `plant_id` / `plant_batch_id` is required.",
+      requestBody: {
+        required: true,
+        content: { "application/json": { schema: { $ref: "#/components/schemas/PlantEventCreate" } } },
+      },
+      responses: {
+        "201": {
+          description: "The created event.",
+          content: { "application/json": { schema: { $ref: "#/components/schemas/PlantEventEnvelope" } } },
+        },
+        "400": { $ref: "#/components/responses/BadRequest" },
+        "401": unauthorized,
+      },
+    },
+  },
 };
 
 export const schemas: Record<string, unknown> = {
@@ -287,5 +330,44 @@ export const schemas: Record<string, unknown> = {
   HarvestEnvelope: {
     type: "object",
     properties: { data: { $ref: "#/components/schemas/Harvest" } },
+  },
+  PlantEvent: {
+    type: "object",
+    properties: {
+      id: { type: "string", format: "uuid" },
+      plant_id: { type: "string", format: "uuid", nullable: true },
+      plant_batch_id: { type: "string", format: "uuid", nullable: true },
+      type: { type: "string", enum: EVENT_TYPE_ENUM },
+      note: { type: "string", nullable: true },
+      detail: { type: "string", nullable: true, description: "Optional JSON payload, e.g. { from, to }." },
+      occurred_datetime: { type: "string", format: "date-time", nullable: true },
+      inserted_datetime: { type: "string", format: "date-time" },
+      updated_datetime: { type: "string", format: "date-time" },
+    },
+  },
+  PlantEventCreate: {
+    type: "object",
+    description: "One of plant_id / plant_batch_id is required.",
+    required: ["type"],
+    properties: {
+      plant_id: { type: "string", format: "uuid", nullable: true },
+      plant_batch_id: { type: "string", format: "uuid", nullable: true },
+      type: { type: "string", enum: EVENT_TYPE_ENUM },
+      note: { type: "string", nullable: true },
+      detail: { type: "string", nullable: true },
+      occurred_at: { type: "string", format: "date-time", nullable: true },
+    },
+  },
+  PlantEventList: {
+    type: "object",
+    properties: {
+      data: { type: "array", items: { $ref: "#/components/schemas/PlantEvent" } },
+      next_page: { type: "string", nullable: true },
+      total: { type: "integer" },
+    },
+  },
+  PlantEventEnvelope: {
+    type: "object",
+    properties: { data: { $ref: "#/components/schemas/PlantEvent" } },
   },
 };

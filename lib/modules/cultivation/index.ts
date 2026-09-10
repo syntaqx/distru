@@ -8,3 +8,4 @@
 export * from "./plant-batches";
 export * from "./plants";
 export * from "./harvests";
+export * from "./plant-events";

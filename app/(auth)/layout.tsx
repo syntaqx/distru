@@ -1,9 +1,14 @@
+import { Suspense } from "react";
 import { Logo } from "@/components/brand";
 import { DemoResetNotice } from "@/components/demo-reset-notice";
+import { TopProgress } from "@/components/top-progress";
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-col items-center px-4 pb-12 pt-[12vh]">
+      <Suspense fallback={null}>
+        <TopProgress />
+      </Suspense>
       <div className="w-full max-w-sm">
         <div className="mb-8 flex justify-center">
           <Logo className="text-lg" />

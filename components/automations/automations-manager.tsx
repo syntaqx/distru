@@ -179,9 +179,9 @@ export function AutomationsManager({ initial }: { initial: WorkflowLite[] }) {
   }
 
   return (
-    <div className="flex h-full min-h-0">
+    <div className="flex h-full min-h-0 flex-col md:flex-row">
       {/* List */}
-      <aside className="flex w-64 shrink-0 flex-col border-r">
+      <aside className="flex max-h-56 w-full shrink-0 flex-col border-b md:max-h-none md:w-64 md:border-r md:border-b-0">
         <div className="border-b p-3">
           <button className="btn btn-primary w-full" onClick={() => setCreating(true)}>
             <Plus size={16} /> New automation

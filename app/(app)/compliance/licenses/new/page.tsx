@@ -12,7 +12,7 @@ export default async function NewLicensePage() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto p-4 sm:p-6">
         <LicenseForm
           initial={{ licenseNumber: "", licenseTypeId: "", name: "", state: "", expiresAt: "" }}
           types={types.map((t) => ({ id: t.id, name: t.name }))}

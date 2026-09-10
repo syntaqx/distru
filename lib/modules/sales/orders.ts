@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { companies, locations, orderCharges, orderItems, orders } from "@/db/schema";
 import type { ServiceCtx } from "../shared";
 import { recordAudit, customData, datetime, num, ref, assertPositiveQuantities } from "../shared";
-import { adjustInventory } from "../inventory";
+import { issueStock, receiveStock } from "../inventory";
 import { getDefaultLocation } from "../catalog";
 import { getMarketplaceProvider, getTraceabilityProvider } from "@/lib/integrations/sync";
 
@@ -126,6 +126,26 @@ export function orderTotal(items: { quantity: string | number; unitPrice: string
   return items.reduce((sum, i) => sum + lineTotal(i), 0);
 }
 
+/**
+ * Quantity soft-held on PENDING orders per product - stock that's spoken for but
+ * not yet committed to the ledger (committing happens when an order leaves
+ * PENDING). This is the "reserved" figure for the inventory availability split.
+ */
+export async function reservedByProduct(ctx: ServiceCtx): Promise<Map<string, number>> {
+  const rows = await db
+    .select({
+      productId: orderItems.productId,
+      qty: sql<string>`coalesce(sum(${orderItems.quantity}), 0)`,
+    })
+    .from(orderItems)
+    .innerJoin(orders, eq(orderItems.orderId, orders.id))
+    .where(and(eq(orders.organizationId, ctx.orgId), eq(orders.status, "PENDING")))
+    .groupBy(orderItems.productId);
+  const map = new Map<string, number>();
+  for (const r of rows) if (r.productId) map.set(r.productId, Number(r.qty));
+  return map;
+}
+
 /** Next per-org order number, e.g. SO-0001. */
 export async function nextOrderNumber(ctx: ServiceCtx) {
   const [{ value }] = await db
@@ -135,19 +155,45 @@ export async function nextOrderNumber(ctx: ServiceCtx) {
   return `SO-${String(Number(value) + 1).padStart(4, "0")}`;
 }
 
-/** Post (decrement) or restore stock for every line of an order at its location. */
+/**
+ * Post (decrement) or restore stock for every line of an order at its location.
+ *
+ * Shipping (direction -1) FIFO-issues through the cost engine - which **blocks**
+ * if a line exceeds on-hand - and records the real COGS consumed on the line, so
+ * the order carries a true gross margin. Canceling (direction +1) re-opens a
+ * cost layer at the COGS that was removed, keeping valuation consistent.
+ */
 async function moveStock(ctx: ServiceCtx, order: OrderRow, items: OrderItemRow[], direction: -1 | 1) {
   const locationId = order.locationId ?? (await getDefaultLocation(ctx)).id;
   for (const item of items) {
     if (!item.productId) continue;
-    const qty = Number(item.quantity) * direction;
+    const qty = Number(item.quantity);
     if (qty === 0) continue;
-    await adjustInventory(ctx, {
-      productId: item.productId,
-      locationId,
-      delta: qty,
-      reason: `sale:${order.orderNumber}`,
-    });
+    if (direction === -1) {
+      const { cogs } = await issueStock(ctx, {
+        productId: item.productId,
+        locationId,
+        qty,
+        reason: `sale:${order.orderNumber}`,
+        refType: "SALE",
+        refId: order.id,
+      });
+      await db
+        .update(orderItems)
+        .set({ cogs: String(cogs) })
+        .where(eq(orderItems.id, item.id));
+    } else {
+      const priorCogs = item.cogs != null ? Number(item.cogs) : 0;
+      await receiveStock(ctx, {
+        productId: item.productId,
+        locationId,
+        qty,
+        unitCost: priorCogs > 0 ? priorCogs / qty : undefined,
+        sourceType: "ADJUSTMENT",
+        sourceId: order.id,
+        reason: `sale-restore:${order.orderNumber}`,
+      });
+    }
   }
 }
 

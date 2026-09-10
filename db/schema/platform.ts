@@ -134,7 +134,9 @@ export const tasks = pgTable(
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
     title: text().notNull(),
+    description: text(),
     status: text().notNull().default("OPEN"), // OPEN | IN_PROGRESS | DONE
+    priority: text().notNull().default("MEDIUM"), // LOW | MEDIUM | HIGH
     assigneeId: uuid("assignee_id").references(() => user.id, { onDelete: "set null" }),
     dueAt: timestamp("due_at", { withTimezone: true }),
     entityType: text("entity_type"),

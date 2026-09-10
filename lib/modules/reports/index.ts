@@ -7,3 +7,4 @@
  */
 export * from "./artifacts";
 export * from "./insights-reports";
+export * from "./analytics";

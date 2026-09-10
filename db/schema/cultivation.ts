@@ -1,4 +1,4 @@
-import { integer, numeric, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { index, integer, numeric, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { organization } from "./auth";
 import { locations, strains } from "./catalog";
 import { pk, timestamps, plantPhase, harvestStatus } from "./_shared";
@@ -63,4 +63,32 @@ export const harvests = pgTable(
     ...timestamps(),
   },
   (t) => [uniqueIndex("harvests_org_number_uq").on(t.organizationId, t.harvestNumber)],
+);
+
+/**
+ * A lifecycle event on a plant or plant batch - the Metrc-style audit timeline
+ * for the grow. `type` is kept as text (MOVE | FEED | PHASE_CHANGE | DESTROY |
+ * HARVEST | NOTE) rather than an enum so new event kinds don't require a schema
+ * migration. Exactly one of plantId / plantBatchId is set for a given event,
+ * though the shape allows either; both cascade so an event never outlives its
+ * subject.
+ */
+export const plantEvents = pgTable(
+  "plant_events",
+  {
+    id: pk(),
+    organizationId: uuid().notNull().references(() => organization.id, { onDelete: "cascade" }),
+    plantId: uuid("plant_id").references(() => plants.id, { onDelete: "cascade" }),
+    plantBatchId: uuid("plant_batch_id").references(() => plantBatches.id, { onDelete: "cascade" }),
+    type: text().notNull(), // MOVE | FEED | PHASE_CHANGE | DESTROY | HARVEST | NOTE
+    note: text(),
+    // Free-form structured payload (e.g. { from: "VEGETATIVE", to: "FLOWERING" }).
+    detail: text(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+    ...timestamps(),
+  },
+  (t) => [
+    index("plant_events_org_plant_idx").on(t.organizationId, t.plantId),
+    index("plant_events_org_batch_idx").on(t.organizationId, t.plantBatchId),
+  ],
 );

@@ -20,6 +20,8 @@ export const metadata: Metadata = {
   title: { default: "Distru", template: "%s · Distru" },
   description: DESCRIPTION,
   applicationName: "Distru",
+  // A demo recreation, not a real product - keep it out of search indexes.
+  robots: { index: false, follow: false },
   openGraph: {
     type: "website",
     siteName: "Distru",

@@ -10,6 +10,7 @@ export * from "./logistics";
 export * from "./cultivation";
 export * from "./imports";
 export * from "./platform";
+export * from "./integrations";
 export * from "./chat";
 export * from "./workflows";
 export * from "./reports";

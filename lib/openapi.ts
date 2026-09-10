@@ -43,18 +43,48 @@ export function buildOpenApiSpec(baseUrl: string): Record<string, unknown> {
     info: {
       title: "Distru Public API",
       version: "1.0.0",
-      description:
-        "Distru's public REST API for catalog and inventory. Conventions mirror " +
-        "Distru: Bearer-token auth; UUID ids; numbers serialized as strings; " +
-        "uppercase enums; nulls always present; pagination via `page[number]` " +
-        "(1-based) echoing a `next_page` URL for the following page (`page[after]` " +
-        "is also accepted as an opaque cursor); " +
-        "sparse upsert on writes (omit id to create, include to " +
-        "update, send null to clear); and an `{ \"errors\": [{ \"message\", " +
-        "\"pointer\" }] }` envelope. Two more faces exist alongside this one: a " +
-        "bulk uploader at `POST /api/upload-products` (multipart CSV/XLSX, chunked " +
-        "validate + partial commit + row-mapped error CSV) and an MCP server at " +
-        "`POST /api/mcp` for driving Distru from an agent.",
+      description: [
+        "The Distru public REST API operates your entire workspace — catalog, inventory, sales, purchasing, manufacturing, compliance, cultivation, and more. Every response is the same data the in-app Copilot, the MCP server, and the bulk importer read and write: **one service layer, many faces.**",
+        "",
+        "## Authentication",
+        "All requests require a Bearer token. Mint one in the app under **Settings → API tokens**, then send it on every request:",
+        "```http",
+        "Authorization: Bearer dk_live_xxxxxxxxxxxxxxxxxxxx",
+        "```",
+        "Tokens are org-scoped and stored hashed. Unauthenticated requests get `401`.",
+        "",
+        "## Base URL & conventions",
+        "- **Base URL:** `" + baseUrl + "/public/v1`",
+        "- **IDs** are UUIDs.",
+        "- **Numbers** (money, quantities) are serialized as **strings** with fixed precision, e.g. `\"25.000000\"`.",
+        "- **Datetimes** are ISO-8601 with microseconds and a `Z` suffix; the universal created key is `inserted_datetime`.",
+        "- **Enums** are UPPERCASE.",
+        "- **Nulls** are always present (a field is `null`, never omitted).",
+        "",
+        "## Pagination",
+        "List endpoints page with `page[number]` (1-based) and echo a `next_page` URL you can follow for the next page. An opaque cursor `page[after]` is also accepted.",
+        "```http",
+        "GET /public/v1/products?page[number]=2",
+        "```",
+        "",
+        "## Filtering",
+        "Many lists accept filters like `search`, a name/category/vendor filter, a `status` enum, and `updated_datetime` as an inclusive comma-delimited range (`start,end`, either side optional).",
+        "",
+        "## Writes & sparse upsert",
+        "Write endpoints are **sparse upserts**: omit `id` to create, include `id` to update, and only the fields you send change. Send `null` to clear a nullable field.",
+        "",
+        "## Errors",
+        "Errors use a consistent envelope with a machine-readable pointer:",
+        "```json",
+        '{ "errors": [{ "message": "quantity_delta is required", "pointer": ["quantity_delta"], "section": "body" }] }',
+        "```",
+        "Common statuses: `400` bad request, `401` unauthorized, `404` not found, `422` unsupported operation.",
+        "",
+        "## The other faces",
+        "- **Bulk uploader** — `POST /api/upload-products` (multipart CSV/XLSX): chunked detect → map → validate → partial commit → row-mapped error CSV.",
+        "- **MCP server** — `POST /api/mcp` (JSON-RPC over Streamable HTTP): drive Distru from Claude Code, Claude Desktop, or Cursor with the same tool surface as the in-app Copilot.",
+        "- **Webhooks** — HMAC-signed event deliveries you configure under Settings → Webhooks.",
+      ].join("\n"),
     },
     servers: [{ url: baseUrl }],
     security: [{ bearerAuth: [] }],
@@ -227,12 +257,26 @@ export function buildOpenApiSpec(baseUrl: string): Record<string, unknown> {
         },
       },
       "/public/v1/adjustments": {
+        get: {
+          tags: ["Inventory"],
+          summary: "List stock adjustments",
+          description:
+            "Lists inventory movements (Distru StockAdjustments) newest-first: product, location, quantity, unit cost, reason, source, in the standard Distru list envelope.",
+          responses: {
+            "200": {
+              description: "A page of adjustments.",
+              content: { "application/json": { schema: { type: "object" } } },
+            },
+            "401": { $ref: "#/components/responses/Unauthorized" },
+          },
+        },
         post: {
           tags: ["Inventory"],
           summary: "Post a stock adjustment",
           description:
-            "Move on-hand by a relative `quantity_delta` for a product (by `product_id` " +
-            "or `sku`) at a location (default location if omitted).",
+            "Move on-hand by a signed `quantity_delta` (or Distru's `quantity`) for a target " +
+            "identified by `product_id`/`sku`, `package_id`, or `batch_id`, at a location " +
+            "(default if omitted). A positive delta may open a cost layer via `unit_cost`.",
           requestBody: {
             required: true,
             content: { "application/json": { schema: { $ref: "#/components/schemas/StockAdjustmentCreate" } } },

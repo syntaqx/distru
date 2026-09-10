@@ -1,6 +1,10 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    # Postgres 18: our time-ordered UUIDv7 keys get better B-tree/index locality
+    # here (and PG18 ships a native uuidv7()). NOTE: a major-version bump can't
+    # read an existing v16 data dir - if the container errors on an old volume,
+    # reset it: `docker compose down -v` (drops the demo data, which reseeds).
+    image: postgres:18-alpine
     container_name: distru-postgres
     restart: unless-stopped
     environment:
@@ -10,7 +14,9 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - distru-pgdata:/var/lib/postgresql/data
+      # PG18's image stores data in a major-version subdir, so the mount is the
+      # parent `/var/lib/postgresql` (NOT `/var/lib/postgresql/data` as on <=17).
+      - distru-pgdata:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U distru -d distru"]
       interval: 5s
@@ -46,15 +52,21 @@ services:
     # Create the schema, seed the demo tenant (both idempotent), then dev with HMR.
     # Uses --webpack because webpack honors WATCHPACK_POLLING, which is what makes
     # hot reload fire over a bind mount on Windows/WSL2 (Turbopack ignores polling).
-    command: sh -c "npm run db:push && npm run db:seed && npx next dev --webpack -H 0.0.0.0 -p 3000"
+    command: sh -c "npm run build:docs && npm run maplibre:worker && npm run db:push && npm run db:seed && npx next dev --webpack -H 0.0.0.0 -p 3000"
+    # Real readiness: /readyz returns 200 only once Next has booted AND Postgres
+    # is reachable (it runs `select 1`). Because the command below builds docs,
+    # pushes schema, and seeds BEFORE `next dev` starts, /readyz stays
+    # unreachable until all of that is done - so "healthy" means genuinely ready
+    # to serve, not just "node started". `start_period` keeps early failures from
+    # counting against the retry budget while it boots.
     healthcheck:
       test:
         - CMD-SHELL
-        - node -e "fetch('http://localhost:3000/sign-in').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        - node -e "fetch('http://localhost:3000/readyz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
       interval: 10s
       timeout: 5s
       retries: 30
-      start_period: 60s
+      start_period: 90s
 
 volumes:
   distru-pgdata:

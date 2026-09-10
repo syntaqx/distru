@@ -47,6 +47,16 @@ export default async function OrderDetailPage({
 
   const total = orderTotal(o.items);
 
+  // Gross margin, computed only from lines that carry a real COGS (posted once
+  // stock is committed). Revenue is the item subtotal so it lines up with the
+  // per-line cost of goods sold.
+  const costedLines = o.items.filter((l) => l.cogs != null);
+  const hasMargin = costedLines.length > 0;
+  const cogs = costedLines.reduce((a, l) => a + Number(l.cogs), 0);
+  const revenue = total;
+  const grossMargin = revenue - cogs;
+  const marginPct = revenue > 0 ? (grossMargin / revenue) * 100 : 0;
+
   const facts: [string, ReactNode][] = [
     ["Customer", o.customer?.name ?? "-"],
     [
@@ -76,7 +86,7 @@ export default async function OrderDetailPage({
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <header className="flex items-center justify-between border-b px-6 py-4">
+      <header className="flex items-center justify-between border-b px-4 py-4 sm:px-6">
         <div className="flex items-center gap-3">
           <Link
             href="/sales"
@@ -99,7 +109,7 @@ export default async function OrderDetailPage({
         </div>
       </header>
 
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto p-4 sm:p-6">
         <div className="mx-auto max-w-4xl space-y-4">
           <section className="card">
             <h2 className="mb-3 text-sm font-semibold">Details</h2>
@@ -169,6 +179,35 @@ export default async function OrderDetailPage({
               </table>
             </div>
           </section>
+
+          {hasMargin && (
+            <section className="card">
+              <h2 className="mb-3 text-sm font-semibold">Gross margin</h2>
+              <dl className="grid gap-y-3 text-sm sm:grid-cols-3">
+                <div>
+                  <dt className="text-xs text-muted">Revenue</dt>
+                  <dd className="mt-0.5 tabular-nums">{money(revenue)}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted">COGS</dt>
+                  <dd className="mt-0.5 tabular-nums">{money(cogs)}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted">Gross margin</dt>
+                  <dd
+                    className={`mt-0.5 tabular-nums font-semibold ${
+                      grossMargin >= 0 ? "text-accent" : "text-danger"
+                    }`}
+                  >
+                    {money(grossMargin)}{" "}
+                    <span className="font-normal text-muted">
+                      ({marginPct.toFixed(1)}%)
+                    </span>
+                  </dd>
+                </div>
+              </dl>
+            </section>
+          )}
 
           <section className="card">
             <h2 className="mb-3 text-sm font-semibold">Actions</h2>

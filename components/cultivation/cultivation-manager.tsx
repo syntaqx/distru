@@ -97,7 +97,7 @@ export function CultivationManager({
 
   return (
     <div>
-      <div className="mb-6 grid grid-cols-3 gap-3">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
         {[
           ["Plant batches", plantBatches.length, <Sprout key="s" size={14} />],
           ["Living plants", livingPlants, <Leaf key="l" size={14} />],
@@ -112,7 +112,7 @@ export function CultivationManager({
         ))}
       </div>
 
-      <div className="mb-4 flex items-center gap-2">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
         <div
           className="flex rounded-lg border p-0.5"
           style={{ background: "var(--color-surface)" }}
@@ -165,7 +165,7 @@ export function CultivationManager({
                 <tr key={b.id} className="border-t" style={{ background: "var(--color-surface)" }}>
                   <td className="px-4 py-2.5">
                     <Link
-                      href={`/cultivation/plant-batches/${b.id}/edit`}
+                      href={`/cultivation/plant-batches/${b.id}`}
                       className="font-mono text-xs text-info hover:underline"
                     >
                       {b.batchNumber}
@@ -217,7 +217,7 @@ export function CultivationManager({
                   <tr key={p.id} className="border-t" style={{ background: "var(--color-surface)" }}>
                     <td className="px-4 py-2.5">
                       <Link
-                        href={`/cultivation/plants/${p.id}/edit`}
+                        href={`/cultivation/plants/${p.id}`}
                         className="font-mono text-xs text-info hover:underline"
                       >
                         {p.plantTag}
@@ -281,7 +281,7 @@ export function CultivationManager({
                 <tr key={h.id} className="border-t" style={{ background: "var(--color-surface)" }}>
                   <td className="px-4 py-2.5">
                     <Link
-                      href={`/cultivation/harvests/${h.id}/edit`}
+                      href={`/cultivation/harvests/${h.id}`}
                       className="font-mono text-xs text-info hover:underline"
                     >
                       {h.harvestNumber}

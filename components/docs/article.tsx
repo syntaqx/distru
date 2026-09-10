@@ -36,9 +36,9 @@ async function buildParts(body: string): Promise<Part[]> {
 export async function Article({ section, body }: { section: string; body: string }) {
   const parts = await buildParts(body);
   return (
-    <div className="mx-auto max-w-3xl px-8 py-8">
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-8">
       <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">{section}</div>
-      <div className="copilot-md space-y-4 text-sm leading-relaxed">
+      <div className="copilot-md docs-md space-y-4 text-sm leading-relaxed">
         {parts.map((p, i) =>
           p.type === "code" ? (
             <div key={i} className="doc-shiki" dangerouslySetInnerHTML={{ __html: p.html }} />

@@ -1,6 +1,9 @@
 import { registerTools } from "../registry";
 import { catalogTools } from "./catalog";
 import { mutationTools } from "./mutations";
+import { inventoryTools } from "./inventory";
+import { taskTools } from "./tasks";
+import { integrationTools } from "./integrations";
 import { salesTools } from "./sales";
 import { analyticsTools } from "./analytics";
 import { importTools } from "./imports";
@@ -9,7 +12,12 @@ import { workflowTools } from "./workflows";
 import { cultivationTools } from "./cultivation";
 import { purchasingTools } from "./purchasing";
 import { manufacturingTools } from "./manufacturing";
+import { schedulingTools } from "./scheduling";
 import { complianceTools } from "./compliance";
+import { growTools } from "./grow";
+import { logisticsTools } from "./logistics";
+import { dispatchTools } from "./dispatch";
+import { crmTools } from "./crm";
 import { reportTools } from "./reports";
 import { askUser } from "./ask";
 
@@ -21,6 +29,9 @@ export function ensureToolsRegistered() {
   registerTools([
     ...catalogTools,
     ...mutationTools,
+    ...inventoryTools,
+    ...taskTools,
+    ...integrationTools,
     ...salesTools,
     ...analyticsTools,
     ...importTools,
@@ -29,7 +40,12 @@ export function ensureToolsRegistered() {
     ...cultivationTools,
     ...purchasingTools,
     ...manufacturingTools,
+    ...schedulingTools,
     ...complianceTools,
+    ...growTools,
+    ...logisticsTools,
+    ...dispatchTools,
+    ...crmTools,
     ...reportTools,
     askUser,
   ]);

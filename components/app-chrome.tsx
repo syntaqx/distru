@@ -1,12 +1,13 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
+import { Menu } from "lucide-react";
 import { Sidebar } from "@/components/sidebar";
 import { TopBar } from "@/components/topbar";
-import { OrgSwitcher } from "@/components/org-switcher";
 import { CopilotPanel } from "@/components/chat/copilot-panel";
 import { ThemeProvider } from "@/components/theme";
 import { TopProgress } from "@/components/top-progress";
+import type { DocNav } from "@/lib/docs/types";
 
 const STORAGE_KEY = "distru:copilot:open";
 
@@ -19,14 +20,17 @@ export function AppChrome({
   orgName,
   userName,
   userEmail,
+  docsNav,
   children,
 }: {
   orgName: string;
   userName: string;
   userEmail: string;
+  docsNav: DocNav[];
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -66,16 +70,29 @@ export function AppChrome({
       <Suspense fallback={null}>
         <TopProgress />
       </Suspense>
-      <div className="flex h-dvh flex-col overflow-hidden">
-        <div className="flex h-14 shrink-0 border-b" style={{ background: "var(--color-surface)" }}>
-          <div className="flex w-64 shrink-0 items-center border-r px-2">
-            <OrgSwitcher initialName={orgName} />
+      <div className="flex h-dvh overflow-hidden">
+        <Sidebar
+          orgName={orgName}
+          userName={userName}
+          userEmail={userEmail}
+          docsNav={docsNav}
+          mobileOpen={navOpen}
+          onMobileClose={() => setNavOpen(false)}
+        />
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          <div
+            className="flex h-14 shrink-0 items-center border-b"
+            style={{ background: "var(--color-surface)" }}
+          >
+            <button
+              className="ml-1 rounded-lg p-2 text-muted hover:bg-surface2 hover:text-fg md:hidden"
+              onClick={() => setNavOpen(true)}
+              aria-label="Open menu"
+            >
+              <Menu size={18} />
+            </button>
+            <TopBar onToggleCopilot={() => setOpen((v) => !v)} copilotOpen={open} />
           </div>
-          <TopBar onToggleCopilot={() => setOpen((v) => !v)} copilotOpen={open} />
-        </div>
-
-        <div className="flex min-w-0 flex-1 overflow-hidden">
-          <Sidebar userName={userName} userEmail={userEmail} />
           <main className="min-w-0 flex-1 overflow-hidden">{children}</main>
         </div>
       </div>

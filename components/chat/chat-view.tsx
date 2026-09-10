@@ -294,15 +294,21 @@ export function ChatView({
     if (r) await sendMessage(`I uploaded ${file.name}. What can you do with it?`, r.jobId);
   }
 
+  // On mount, start a *fresh* chat (like claude.ai) - load the conversation list
+  // for the History view, but don't auto-resume the last thread. The panel
+  // remounts this view on each reopen, so reopening always starts new.
   useEffect(() => {
     (async () => {
       const res = await fetch("/api/conversations");
       if (!res.ok) return;
       const { conversations } = (await res.json()) as { conversations: ConversationLite[] };
       setConversations(conversations);
-      if (conversations[0]) await openConversation(conversations[0].id);
     })();
   }, []);
+
+  // Abort any in-flight turn if this view unmounts (e.g. the panel remounts it
+  // for a new chat while a stream is still running).
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
