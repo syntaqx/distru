@@ -7,7 +7,6 @@ import {
   advanceDeliveryStatus,
   assignDelivery,
   createDeliveryFromOrder,
-  simulateTelemetryTick,
   upsertDriver,
   upsertVehicle,
   type DeliveryStatus,
@@ -144,30 +143,3 @@ export async function advanceDeliveryAction(input: {
   }
 }
 
-// ---------------- Dispatch (telemetry simulation) ----------------
-
-/**
- * Advance the persisted telemetry snapshot one deterministic step (or several),
- * nudging each en-route vehicle toward its current stop and marking arrivals.
- * The Dispatch map tweens smoothly on the client; this is the optional server
- * nudge that moves the underlying "last known ping" through the day.
- */
-export async function advanceDispatchAction(
-  ticks = 1,
-): Promise<{ ok: boolean; error?: string; moved?: number; arrived?: number }> {
-  const service = await svc();
-  try {
-    const n = Math.min(Math.max(Math.round(ticks) || 1, 1), 20);
-    let moved = 0;
-    let arrived = 0;
-    for (let i = 0; i < n; i++) {
-      const res = await simulateTelemetryTick(service);
-      moved += res.moved;
-      arrived += res.arrived;
-    }
-    revalidatePath("/fleet");
-    return { ok: true, moved, arrived };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Could not advance dispatch." };
-  }
-}

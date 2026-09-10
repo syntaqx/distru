@@ -28,9 +28,9 @@ function conventions(): string {
 - **Status codes:** \`400\` invalid request / business-rule violation, \`401\` missing/invalid token, \`403\` token lacks scope, \`404\` not found for your org.`;
 }
 
-/** The list of REST resources, grounded in the actual /public/v1 routes. */
+/** The list of REST resources, grounded in the actual /api/v1 routes. */
 function endpoints(): string {
-  return `## REST resources (\`/public/v1\`)
+  return `## REST resources (\`/api/v1\`)
 
 | Method | Path | Purpose |
 |---|---|---|

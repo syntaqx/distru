@@ -41,7 +41,7 @@ const PERIOD_LABEL: Record<Period, string> = {
 
 /**
  * The Available-reports list is derived from the report registry (the single
- * source of truth that also powers the `/public/v1/reports/*` API and the
+ * source of truth that also powers the `/api/v1/reports/*` API and the
  * `generate_report` tool), grouped in registry order.
  */
 const REPORTS: { group: string; items: { name: string; label: string }[] }[] = (() => {
@@ -351,7 +351,7 @@ export default async function InsightsPage({
           </div>
           <p className="mb-4 text-xs text-muted">
             These are the same reports available over the API at{" "}
-            <code className="font-mono">/public/v1/reports/*</code>. Open the live
+            <code className="font-mono">/api/v1/reports/*</code>. Open the live
             JSON, or <span className="font-medium">save a snapshot to Reports</span> (hover a row) to
             keep, download, or have an automation email it.
           </p>

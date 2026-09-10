@@ -76,26 +76,10 @@ export function FleetManager({
   ];
 
   return (
-    <div>
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {[
-          ["Deliveries", deliveries.length],
-          ["Active", activeDeliveries],
-          ["Drivers", drivers.length],
-          ["Vehicles", vehicles.length],
-        ].map(([label, value]) => (
-          <div key={label} className="card">
-            <div className="text-xs uppercase tracking-wide text-muted">{label}</div>
-            <div className="mt-1 text-2xl font-semibold">{value}</div>
-          </div>
-        ))}
-      </div>
-
-      <div className="mb-4">
-        <div
-          className="inline-flex rounded-lg border p-0.5"
-          style={{ background: "var(--color-surface)" }}
-        >
+    <div className="flex h-full min-h-0 flex-col">
+      {/* Compact header: tabs + inline fleet totals (no big stat cards) */}
+      <div className="mb-3 flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2">
+        <div className="inline-flex rounded-lg border p-0.5" style={{ background: "var(--color-surface)" }}>
           {tabs.map(({ key, label }) => (
             <button
               key={key}
@@ -109,42 +93,53 @@ export function FleetManager({
             </button>
           ))}
         </div>
+        {tab !== "dispatch" && (
+          <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
+            <span><b className="font-semibold text-fg">{vehicles.length}</b> vehicles</span>
+            <span><b className="font-semibold text-fg">{drivers.length}</b> drivers</span>
+            <span><b className="font-semibold text-fg">{activeDeliveries}</b> active</span>
+            <span><b className="font-semibold text-fg">{deliveries.length}</b> deliveries</span>
+          </div>
+        )}
       </div>
 
-      {(tab === "drivers" || tab === "vehicles") && (
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <div className="relative max-w-sm flex-1">
-            <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-            <input
-              className="input pl-9"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder={tab === "drivers" ? "Search drivers..." : "Search vehicles..."}
-            />
+      {tab === "dispatch" ? (
+        <div className="min-h-0 flex-1">
+          <DispatchBoard telemetry={telemetry} />
+        </div>
+      ) : tab === "deliveries" ? (
+        <div className="min-h-0 flex-1 overflow-auto">
+          <DeliveriesBoard
+            deliveries={deliveries}
+            drivers={drivers.map((d) => ({ id: d.id, name: d.name }))}
+            vehicles={vehicles.map((v) => ({ id: v.id, name: v.name }))}
+            assignableOrders={assignableOrders}
+          />
+        </div>
+      ) : (
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="mb-3 flex shrink-0 flex-wrap items-center gap-2">
+            <div className="relative max-w-sm flex-1">
+              <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+              <input
+                className="input pl-9"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder={tab === "drivers" ? "Search drivers..." : "Search vehicles..."}
+              />
+            </div>
+            {tab === "drivers" ? (
+              <Link href="/fleet/drivers/new" className="btn btn-primary ml-auto">
+                <Plus size={16} /> New driver
+              </Link>
+            ) : (
+              <Link href="/fleet/vehicles/new" className="btn btn-primary ml-auto">
+                <Plus size={16} /> New vehicle
+              </Link>
+            )}
           </div>
           {tab === "drivers" ? (
-            <Link href="/fleet/drivers/new" className="btn btn-primary ml-auto">
-              <Plus size={16} /> New driver
-            </Link>
-          ) : (
-            <Link href="/fleet/vehicles/new" className="btn btn-primary ml-auto">
-              <Plus size={16} /> New vehicle
-            </Link>
-          )}
-        </div>
-      )}
-
-      {tab === "dispatch" ? (
-        <DispatchBoard telemetry={telemetry} />
-      ) : tab === "deliveries" ? (
-        <DeliveriesBoard
-          deliveries={deliveries}
-          drivers={drivers.map((d) => ({ id: d.id, name: d.name }))}
-          vehicles={vehicles.map((v) => ({ id: v.id, name: v.name }))}
-          assignableOrders={assignableOrders}
-        />
-      ) : tab === "drivers" ? (
-        <div className="overflow-x-auto rounded-xl border">
+            <div className="min-h-0 flex-1 overflow-auto rounded-xl border">
           <table className="w-full min-w-140 text-sm">
             <thead>
               <tr className="text-left text-muted" style={{ background: "var(--color-surface)" }}>
@@ -188,7 +183,7 @@ export function FleetManager({
           </table>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border">
+        <div className="min-h-0 flex-1 overflow-auto rounded-xl border">
           <table className="w-full min-w-140 text-sm">
             <thead>
               <tr className="text-left text-muted" style={{ background: "var(--color-surface)" }}>
@@ -235,6 +230,8 @@ export function FleetManager({
               )}
             </tbody>
           </table>
+        </div>
+          )}
         </div>
       )}
     </div>

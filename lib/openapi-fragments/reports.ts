@@ -188,7 +188,7 @@ function operation(def: ReportDef) {
 }
 
 export const paths: Record<string, unknown> = Object.fromEntries(
-  REPORTS.map((def) => [`/public/v1/reports/${def.name}`, operation(def)]),
+  REPORTS.map((def) => [`/api/v1/reports/${def.name}`, operation(def)]),
 );
 
 export const schemas: Record<string, unknown> = {

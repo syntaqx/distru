@@ -20,3 +20,10 @@ export {
   type EmailResult,
   type DriveResult,
 } from "./delivery";
+export {
+  getRoutingProvider,
+  type RoutingProvider,
+  type RouteResult,
+  type RouteLeg,
+  type LngLat,
+} from "./routing";

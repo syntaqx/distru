@@ -57,7 +57,7 @@ A speak-from script for the walkthrough. Rough timings in brackets; talk to the 
 
 ## 4. Scale + faithfulness in one line each [~0:30]
 
-> "Scale: rows live in `import_rows` in Postgres, processed in chunks within the serverless budget; past 10k the same chunk functions move behind a queue — no rewrite, because it's already job-backed. Faithfulness: the public API is field-accurate to Distru's real OpenAPI — 150 documented routes with a build-time drift guard, browsable in an in-app API Reference explorer — and the external systems are API-accurate mocks behind a real seam, not faked inline."
+> "Scale: rows live in `import_rows` in Postgres, processed in chunks within the serverless budget; past 10k the same chunk functions move behind a queue — no rewrite, because it's already job-backed. Faithfulness: the public API is field-accurate to Distru's real OpenAPI — 152 documented routes with a build-time drift guard, browsable in an in-app API Reference explorer — and the external systems run mocked in the demo behind a config-aware seam that switches to live adapters (OAuth/REST/SMTP) on real credentials, not faked inline."
 
 ## 5. MVP vs. deferred — the scope call [~0:45]
 

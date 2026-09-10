@@ -36,6 +36,16 @@ export const env = {
   // "mock" (default) simulates a connected account; "none" = unconnected.
   emailProvider: (process.env.EMAIL_PROVIDER ?? "mock").toLowerCase(),
   driveProvider: (process.env.DRIVE_PROVIDER ?? "mock").toLowerCase(),
+  // Road-routing provider for the dispatch map (see lib/integrations/routing).
+  //   "osrm"   (default) - real street geometry from the free, keyless OSRM demo
+  //                        server; no credentials needed.
+  //   "mapbox" - real geometry from Mapbox Directions (needs MAPBOX_TOKEN).
+  //   "none"   - no road routing; the map draws straight depot->stop lines.
+  // Env-selected exactly like the other integration seams, so a tenant can point
+  // it at their own directions API without touching the callers.
+  routingProvider: (process.env.ROUTING_PROVIDER ?? "osrm").toLowerCase(),
+  routingBaseUrl: process.env.OSRM_BASE_URL ?? "https://router.project-osrm.org",
+  mapboxToken: process.env.MAPBOX_TOKEN ?? "",
 };
 
 export const hasAnthropicKey = () => env.anthropicApiKey.length > 0;

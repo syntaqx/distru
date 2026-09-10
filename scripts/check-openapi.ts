@@ -1,7 +1,7 @@
 /**
  * OpenAPI self-documentation guard (run on every build via prebuild).
  *
- * The route.ts filesystem under app/public/v1 is the source of truth for what
+ * The route.ts filesystem under app/api/v1 is the source of truth for what
  * public endpoints exist. This asserts the OpenAPI spec documents EXACTLY those:
  *   1. every route on disk is documented (or explicitly opted out) - no endpoint
  *      ever ships undocumented;
@@ -18,11 +18,11 @@ import { join, relative, sep } from "node:path";
 import { buildOpenApiSpec, OPENAPI_IGNORE } from "@/lib/openapi";
 
 const ROOT = process.cwd();
-const ROUTES_DIR = join(ROOT, "app", "public", "v1");
+const ROUTES_DIR = join(ROOT, "app", "api", "v1");
 const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
 const ignore = new Set(OPENAPI_IGNORE);
 
-/** Every route.ts under app/public/v1, as { openApiPath -> exported methods }. */
+/** Every route.ts under app/api/v1, as { openApiPath -> exported methods }. */
 function routesOnDisk(): Map<string, Set<string>> {
   const found = new Map<string, Set<string>>();
   const walk = (dir: string) => {
@@ -32,7 +32,7 @@ function routesOnDisk(): Map<string, Set<string>> {
         walk(full);
       } else if (entry === "route.ts") {
         const rel = relative(ROUTES_DIR, dir).split(sep).join("/");
-        const raw = "/public/v1" + (rel ? "/" + rel : "");
+        const raw = "/api/v1" + (rel ? "/" + rel : "");
         const path = raw.replace(/\[(\w+)\]/g, "{$1}");
         const src = readFileSync(full, "utf8");
         const methods = new Set(
@@ -57,7 +57,7 @@ function main() {
   };
   const specPaths = new Map<string, Record<string, Op>>();
   for (const [p, ops] of Object.entries(spec.paths)) {
-    if (p.startsWith("/public/v1")) specPaths.set(p, ops);
+    if (p.startsWith("/api/v1")) specPaths.set(p, ops);
   }
 
   const problems: string[] = [];

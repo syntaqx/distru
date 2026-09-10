@@ -3,10 +3,12 @@ import { defineTool, type AgentContext } from "../tool";
 import type { HarnessToolPreview } from "../types";
 import {
   PROVIDER_CATALOG,
+  configureProvider,
   connectProvider,
   disconnectProvider,
   isProviderKey,
   listConnections,
+  providerMeta,
   runMockSync,
   type ProviderKey,
 } from "@/lib/modules/platform";
@@ -55,6 +57,8 @@ export const listIntegrationsTool = defineTool({
           label: c.label,
           category: c.category,
           status: c.status,
+          configured: c.configured,
+          required_config: c.configFields.filter((f) => f.required).map((f) => f.key),
           connected_at: c.connectedAt ? c.connectedAt.toISOString() : null,
           last_synced_at: c.lastSyncedAt ? c.lastSyncedAt.toISOString() : null,
         })),
@@ -82,9 +86,59 @@ export const connectIntegrationTool = defineTool({
   async execute(input, ctx: AgentContext) {
     const key = resolveProvider(input.provider);
     if (!key) return { ok: false, summary: `Unknown provider "${input.provider}".` };
-    await connectProvider(ctx.service, key);
     const meta = PROVIDER_CATALOG.find((p) => p.key === key)!;
-    return { ok: true, summary: `Connected ${meta.label}.`, data: { provider: key, status: "connected" } };
+    try {
+      await connectProvider(ctx.service, key);
+      return { ok: true, summary: `Connected ${meta.label}.`, data: { provider: key, status: "connected" } };
+    } catch (err) {
+      // Not configured yet - surface the honest setup requirement.
+      return { ok: false, summary: err instanceof Error ? err.message : "Connect failed." };
+    }
+  },
+});
+
+export const configureIntegrationTool = defineTool({
+  name: "configure_integration",
+  description:
+    "Set up a third-party integration's credentials (e.g. QuickBooks realm id + " +
+    "OAuth client id/secret, Metrc vendor/user keys, Onfleet API key). Pass the " +
+    "provider key or label and a `config` object of field keys to values; once " +
+    "every required field is present the provider connects automatically. Use " +
+    "list_integrations to see each provider's required_config keys.",
+  gate: "confirmation",
+  inputSchema: z.object({
+    provider: providerArg,
+    config: z
+      .record(z.string(), z.string())
+      .describe("Field key -> value map for this provider's credentials/settings."),
+  }),
+  async buildPreview(input) {
+    const key = resolveProvider(input.provider);
+    if (!key) return confirm("Configure integration", `Unknown provider "${input.provider}".`, []);
+    const meta = providerMeta(key);
+    const keys = Object.keys(input.config ?? {});
+    return confirm(
+      "Configure integration",
+      `Save credentials for ${meta.label} (${keys.length} field(s)).`,
+      // Never echo secret values back in the preview.
+      meta.configFields
+        .filter((f) => f.key in (input.config ?? {}))
+        .map((f) => ({ label: f.label, value: f.secret ? "••••••••" : String(input.config[f.key]) })),
+      "medium",
+    );
+  },
+  async execute(input, ctx: AgentContext) {
+    const key = resolveProvider(input.provider);
+    if (!key) return { ok: false, summary: `Unknown provider "${input.provider}".` };
+    const meta = providerMeta(key);
+    const { configured, missing } = await configureProvider(ctx.service, key, input.config ?? {});
+    return {
+      ok: true,
+      summary: configured
+        ? `${meta.label} is set up and connected.`
+        : `Saved ${meta.label} config; still missing: ${missing.join(", ") || "required fields"}.`,
+      data: { provider: key, configured, missing },
+    };
   },
 });
 
@@ -155,6 +209,7 @@ export const syncIntegrationTool = defineTool({
 
 export const integrationTools = [
   listIntegrationsTool,
+  configureIntegrationTool,
   connectIntegrationTool,
   disconnectIntegrationTool,
   syncIntegrationTool,

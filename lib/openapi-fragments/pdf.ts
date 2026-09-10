@@ -2,7 +2,7 @@
 
 /** A single PDF document endpoint: its path template plus how to describe it. */
 type PdfDef = {
-  /** Path template under /public/v1, e.g. "orders/{id}/pdf". */
+  /** Path template under /api/v1, e.g. "orders/{id}/pdf". */
   path: string;
   summary: string;
   description: string;
@@ -11,6 +11,13 @@ type PdfDef = {
 };
 
 const DOCUMENTS: PdfDef[] = [
+  {
+    path: "packages/{id}/label",
+    summary: "Package label PDF",
+    description:
+      "A printable package label: product + SKU, the package tag, its Metrc tag and barcode, quantity, status, and lab-testing state.",
+    idOf: "package",
+  },
   {
     path: "orders/{id}/pdf",
     summary: "Order PDF",
@@ -106,7 +113,7 @@ function operation(def: PdfDef) {
 }
 
 export const paths: Record<string, unknown> = Object.fromEntries(
-  DOCUMENTS.map((def) => [`/public/v1/${def.path}`, operation(def)]),
+  DOCUMENTS.map((def) => [`/api/v1/${def.path}`, operation(def)]),
 );
 
 export const schemas: Record<string, unknown> = {};

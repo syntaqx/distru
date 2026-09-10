@@ -1,6 +1,15 @@
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { inventoryLedger, locations, products } from "@/db/schema";
+import {
+  harvests,
+  inventoryLedger,
+  locations,
+  plantBatches,
+  plantEvents,
+  plants,
+  products,
+  strains,
+} from "@/db/schema";
 import { datetime, num, type ServiceCtx } from "@/lib/modules/shared";
 import { listProducts } from "@/lib/modules/catalog";
 import { inventoryValueByProduct } from "@/lib/modules/inventory";
@@ -682,15 +691,35 @@ export const REPORT_DEFS: ReportDef[] = [
         }));
     },
   },
-  // ---------------- Cultivation (no data surfaced in this clone) ----------------
+  // ---------------- Cultivation (wired to the real grow tables) ----------------
   {
     name: "cultivation-transaction-history",
     label: "Cultivation transaction history",
     group: "Cultivation",
     scope: "manufacturing:read",
-    columns: [],
-    async run() {
-      return [];
+    columns: [
+      { key: "occurred_at", label: "Date" },
+      { key: "type", label: "Event" },
+      { key: "subject", label: "Plant / Batch" },
+      { key: "note", label: "Note" },
+      { key: "detail", label: "Detail" },
+    ],
+    async run(ctx) {
+      const rows = await db
+        .select({ ev: plantEvents, plantTag: plants.plantTag, batchNumber: plantBatches.batchNumber })
+        .from(plantEvents)
+        .leftJoin(plants, eq(plantEvents.plantId, plants.id))
+        .leftJoin(plantBatches, eq(plantEvents.plantBatchId, plantBatches.id))
+        .where(eq(plantEvents.organizationId, ctx.orgId))
+        .orderBy(desc(plantEvents.occurredAt))
+        .limit(500);
+      return rows.map((r) => ({
+        occurred_at: datetime(r.ev.occurredAt),
+        type: r.ev.type,
+        subject: r.plantTag ?? r.batchNumber ?? "—",
+        note: r.ev.note ?? "",
+        detail: r.ev.detail ?? "",
+      }));
     },
   },
   {
@@ -698,9 +727,34 @@ export const REPORT_DEFS: ReportDef[] = [
     label: "Harvest outputs",
     group: "Cultivation",
     scope: "manufacturing:read",
-    columns: [],
-    async run() {
-      return [];
+    columns: [
+      { key: "harvest_number", label: "Harvest" },
+      { key: "name", label: "Name" },
+      { key: "strain", label: "Strain" },
+      { key: "plant_count", label: "Plants" },
+      { key: "wet_weight", label: "Wet Weight" },
+      { key: "dry_weight", label: "Dry Weight" },
+      { key: "status", label: "Status" },
+      { key: "harvested_date", label: "Harvested" },
+    ],
+    async run(ctx) {
+      const rows = await db
+        .select({ h: harvests, strain: strains.name })
+        .from(harvests)
+        .leftJoin(strains, eq(harvests.strainId, strains.id))
+        .where(eq(harvests.organizationId, ctx.orgId))
+        .orderBy(desc(harvests.harvestedDate))
+        .limit(500);
+      return rows.map((r) => ({
+        harvest_number: r.h.harvestNumber,
+        name: r.h.name ?? "",
+        strain: r.strain ?? "—",
+        plant_count: r.h.plantCount,
+        wet_weight: num(r.h.wetWeight),
+        dry_weight: num(r.h.dryWeight),
+        status: r.h.status,
+        harvested_date: datetime(r.h.harvestedDate),
+      }));
     },
   },
   {
@@ -708,9 +762,32 @@ export const REPORT_DEFS: ReportDef[] = [
     label: "Plant lifecycle",
     group: "Cultivation",
     scope: "manufacturing:read",
-    columns: [],
-    async run() {
-      return [];
+    columns: [
+      { key: "plant_tag", label: "Plant Tag" },
+      { key: "strain", label: "Strain" },
+      { key: "batch", label: "Batch" },
+      { key: "phase", label: "Phase" },
+      { key: "location", label: "Location" },
+      { key: "planted_date", label: "Planted" },
+    ],
+    async run(ctx) {
+      const rows = await db
+        .select({ p: plants, strain: strains.name, batch: plantBatches.batchNumber, location: locations.name })
+        .from(plants)
+        .leftJoin(strains, eq(plants.strainId, strains.id))
+        .leftJoin(plantBatches, eq(plants.plantBatchId, plantBatches.id))
+        .leftJoin(locations, eq(plants.locationId, locations.id))
+        .where(eq(plants.organizationId, ctx.orgId))
+        .orderBy(desc(plants.plantedDate))
+        .limit(500);
+      return rows.map((r) => ({
+        plant_tag: r.p.plantTag,
+        strain: r.strain ?? "—",
+        batch: r.batch ?? "—",
+        phase: r.p.phase,
+        location: r.location ?? "—",
+        planted_date: datetime(r.p.plantedDate),
+      }));
     },
   },
 ];

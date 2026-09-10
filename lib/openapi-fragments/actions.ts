@@ -55,7 +55,7 @@ function echoAction(summary: string, description: string) {
 }
 
 export const paths: Record<string, unknown> = {
-  "/public/v1/invoices/{id}/payments": {
+  "/api/v1/invoices/{id}/payments": {
     get: {
       tags: ["Actions"],
       summary: "List invoice payments",
@@ -80,7 +80,7 @@ export const paths: Record<string, unknown> = {
     },
   },
 
-  "/public/v1/payments/{id}/void": {
+  "/api/v1/payments/{id}/void": {
     post: {
       tags: ["Actions"],
       summary: "Void a payment",
@@ -91,7 +91,7 @@ export const paths: Record<string, unknown> = {
     },
   },
 
-  "/public/v1/products/{id}/images": {
+  "/api/v1/products/{id}/images": {
     get: {
       tags: ["Actions"],
       summary: "List product images",
@@ -117,7 +117,7 @@ export const paths: Record<string, unknown> = {
     },
   },
 
-  "/public/v1/companies/{id}/licenses": {
+  "/api/v1/companies/{id}/licenses": {
     get: {
       tags: ["Actions"],
       summary: "List company licenses",
@@ -128,7 +128,7 @@ export const paths: Record<string, unknown> = {
     },
   },
 
-  "/public/v1/companies/{id}/locations": {
+  "/api/v1/companies/{id}/locations": {
     get: {
       tags: ["Actions"],
       summary: "List company locations",
@@ -139,7 +139,7 @@ export const paths: Record<string, unknown> = {
     },
   },
 
-  "/public/v1/purchases/{id}/payments": {
+  "/api/v1/purchases/{id}/payments": {
     get: {
       tags: ["Actions"],
       summary: "List purchase order payments",
@@ -166,7 +166,7 @@ export const paths: Record<string, unknown> = {
     },
   },
 
-  "/public/v1/credits/{id}/cancel": {
+  "/api/v1/credits/{id}/cancel": {
     post: {
       tags: ["Actions"],
       summary: "Cancel a credit",
@@ -185,19 +185,19 @@ export const paths: Record<string, unknown> = {
     },
   },
 
-  "/public/v1/products/add-costs": echoAction(
+  "/api/v1/products/add-costs": echoAction(
     "Add product costs",
     "Allocate landed costs (`costs[]` of quantity × cost_per_unit) onto a product's open FIFO lots, raising cost basis / COGS. Identify by `product_id` or `sku`.",
   ),
-  "/public/v1/packages/add-costs": echoAction(
+  "/api/v1/packages/add-costs": echoAction(
     "Add package costs",
     "Allocate landed costs onto the package's product lots (raising cost basis / COGS). Identify by `package_id` or `package_tag`.",
   ),
-  "/public/v1/batches/add-costs": echoAction(
+  "/api/v1/batches/add-costs": echoAction(
     "Add batch costs",
     "Allocate landed costs onto the batch's product lots (raising cost basis / COGS). Identify by `batch_id`.",
   ),
-  "/public/v1/packages/finish": {
+  "/api/v1/packages/finish": {
     post: {
       tags: ["Actions"],
       summary: "Finish a package",
@@ -217,7 +217,7 @@ export const paths: Record<string, unknown> = {
       responses: { ...ok200, "400": ok200["200"], "401": unauthorized, "404": notFound },
     },
   },
-  "/public/v1/packages/move": {
+  "/api/v1/packages/move": {
     post: {
       tags: ["Actions"],
       summary: "Move a package",
@@ -242,11 +242,11 @@ export const paths: Record<string, unknown> = {
       responses: { ...ok200, "400": ok200["200"], "401": unauthorized, "404": notFound, "422": ok200["200"] },
     },
   },
-  "/public/v1/assemblies/split_package": echoAction(
+  "/api/v1/assemblies/split_package": echoAction(
     "Split a package",
     "Split a quantity off a package into a new package (repackaging). Identify the source by `package_id` or `package_tag`; pass `quantity` and optional `new_package_tag`.",
   ),
-  "/public/v1/assemblies/create_test_sample": echoAction(
+  "/api/v1/assemblies/create_test_sample": echoAction(
     "Create a test sample",
     "Pull a test sample off a package into a new `is_test_sample` package, consuming it from sellable stock. Identify the source by `package_id`/`package_tag` and pass `quantity`.",
   ),

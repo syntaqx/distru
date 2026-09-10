@@ -64,7 +64,7 @@ This project is framed as a full rebuild of Distru's platform: **every resource 
 ### reports (`lib/modules/reports`)
 | Resource | Depth |
 |---|---|
-| Insights report registry (24 reports; 21 real, 3 cultivation empty), Artifact (durable materialized reports) | **Live** |
+| Insights report registry (24 reports, all real - incl. the 3 cultivation reports), Artifact (durable materialized reports) | **Live** |
 
 ### platform (`lib/modules/platform`)
 | Resource | Depth |

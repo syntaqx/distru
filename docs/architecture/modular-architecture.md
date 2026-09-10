@@ -32,7 +32,7 @@ lib/modules/
 
 Every Distru resource lives in one of these contexts - see [The complete Distru domain](/docs/distru-domain) for the full resource map and how deep each is wired.
 
-Each context also **owns its tables** in `db/schema/*` - `catalog.ts`, `inventory.ts`, `sales.ts`, `purchasing.ts`, `manufacturing.ts`, `compliance.ts`, `cultivation.ts`, `logistics.ts`, `reports.ts`, `platform.ts` (+ `integrations.ts`), `imports.ts`, `notifications.ts` - **68 tables** in all, so a module's data and logic sit together. That table ownership is exactly what a future service would take with it.
+Each context also **owns its tables** in `db/schema/*` - `catalog.ts`, `inventory.ts`, `sales.ts`, `purchasing.ts`, `manufacturing.ts`, `compliance.ts`, `cultivation.ts`, `logistics.ts`, `reports.ts`, `platform.ts` (+ `integrations.ts`), `imports.ts`, `notifications.ts` - **74 tables** in all, so a module's data and logic sit together. That table ownership is exactly what a future service would take with it.
 
 ## The dependency graph (acyclic, layered)
 

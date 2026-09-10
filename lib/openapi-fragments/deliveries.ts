@@ -46,7 +46,7 @@ const idParam = [
 ];
 
 export const paths: Record<string, unknown> = {
-  "/public/v1/deliveries": {
+  "/api/v1/deliveries": {
     get: {
       tags: ["Deliveries"],
       summary: "List deliveries",
@@ -114,7 +114,7 @@ export const paths: Record<string, unknown> = {
     },
   },
 
-  "/public/v1/deliveries/{id}": {
+  "/api/v1/deliveries/{id}": {
     get: {
       tags: ["Deliveries"],
       summary: "Get a delivery",
@@ -131,7 +131,7 @@ export const paths: Record<string, unknown> = {
     },
   },
 
-  "/public/v1/fleet/telemetry": {
+  "/api/v1/fleet/telemetry": {
     get: {
       tags: ["Deliveries"],
       summary: "Get the live fleet telemetry snapshot",

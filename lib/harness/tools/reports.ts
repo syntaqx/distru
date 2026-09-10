@@ -10,6 +10,7 @@ import {
   runReport,
 } from "@/lib/modules/reports";
 import { createNotification } from "@/lib/modules/notifications";
+import { getConnection } from "@/lib/modules/platform";
 import { getDriveProvider, getEmailProvider } from "@/lib/integrations";
 
 function confirm(
@@ -83,7 +84,9 @@ export const emailReportTool = defineTool({
     const art = await getArtifact(ctx.service, input.report_id);
     if (!art) return { ok: false, summary: `No report with id ${input.report_id}.` };
 
-    const email = getEmailProvider();
+    // Use the org's configured Email connection - real SMTP creds send for real.
+    const conn = await getConnection(ctx.service, "email");
+    const email = getEmailProvider(conn?.config);
     if (!email.isConnected()) {
       return {
         ok: false,
@@ -91,7 +94,7 @@ export const emailReportTool = defineTool({
       };
     }
     const subject = input.subject ?? art.title;
-    const res = email.send({ to: input.to, subject, body: art.content });
+    const res = await email.send({ to: input.to, subject, body: art.content });
     if (!res) return { ok: false, summary: "Email delivery failed." };
 
     await recordDelivery(ctx.service, art.id, {

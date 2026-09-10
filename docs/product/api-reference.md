@@ -29,26 +29,26 @@ The API uses two verbs - `GET` to read and `POST` to write - with updates done b
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/public/v1/products` | List products (filters: `page[number]`, `status`, `category`, `vendor`, `search`) |
-| POST | `/public/v1/products` | Create or update a product (sparse upsert) |
-| GET | `/public/v1/products/{id}` | Get one product |
-| GET/POST | `/public/v1/companies` | List / create companies (customers, vendors, brands) |
-| GET | `/public/v1/product-categories` | List categories |
-| POST | `/public/v1/adjustments` | Post a stock adjustment |
-| GET/POST | `/public/v1/orders`, GET `/public/v1/orders/{id}` | Sales orders (+ `/pdf`) |
-| GET/POST | `/public/v1/invoices`, GET `/public/v1/invoices/{id}` | Invoices (+ `/payments`, `/pdf`) |
-| GET/POST | `/public/v1/purchases`, GET `/public/v1/purchases/{id}` | Purchase orders (receiving adds inventory) |
-| GET/POST | `/public/v1/returns`, GET `/public/v1/returns/{id}` | Customer returns (receiving restocks inventory) |
-| GET/POST | `/public/v1/packages`, `/public/v1/batches`, `/public/v1/bins` | Inventory lot units |
-| GET/POST | `/public/v1/transfers` | Stock transfers (+ `/manifest/pdf`) |
-| GET/POST | `/public/v1/assemblies` | Manufacturing assemblies |
-| GET/POST | `/public/v1/plants`, `/public/v1/plant-batches`, `/public/v1/harvests` | Cultivation |
-| GET/POST | `/public/v1/test-results`, `/public/v1/licenses` | Compliance (+ COA `/pdf`) |
-| GET/POST | `/public/v1/deliveries`, `/public/v1/drivers`, `/public/v1/vehicles` | Logistics |
-| GET/POST | `/public/v1/tasks` | Tasks |
-| GET | `/public/v1/reports/{name}` | The report registry (about two dozen reports) |
-| GET | `/public/v1/metrc/...` | Read-only Metrc mirror (packages, transfers, tags, ...) |
-| GET | `/public/v1/locations`, `/public/v1/unit-types` | Reference data |
+| GET | `/api/v1/products` | List products (filters: `page[number]`, `status`, `category`, `vendor`, `search`) |
+| POST | `/api/v1/products` | Create or update a product (sparse upsert) |
+| GET | `/api/v1/products/{id}` | Get one product |
+| GET/POST | `/api/v1/companies` | List / create companies (customers, vendors, brands) |
+| GET | `/api/v1/product-categories` | List categories |
+| POST | `/api/v1/adjustments` | Post a stock adjustment |
+| GET/POST | `/api/v1/orders`, GET `/api/v1/orders/{id}` | Sales orders (+ `/pdf`) |
+| GET/POST | `/api/v1/invoices`, GET `/api/v1/invoices/{id}` | Invoices (+ `/payments`, `/pdf`) |
+| GET/POST | `/api/v1/purchases`, GET `/api/v1/purchases/{id}` | Purchase orders (receiving adds inventory) |
+| GET/POST | `/api/v1/returns`, GET `/api/v1/returns/{id}` | Customer returns (receiving restocks inventory) |
+| GET/POST | `/api/v1/packages`, `/api/v1/batches`, `/api/v1/bins` | Inventory lot units |
+| GET/POST | `/api/v1/transfers` | Stock transfers (+ `/manifest/pdf`) |
+| GET/POST | `/api/v1/assemblies` | Manufacturing assemblies |
+| GET/POST | `/api/v1/plants`, `/api/v1/plant-batches`, `/api/v1/harvests` | Cultivation |
+| GET/POST | `/api/v1/test-results`, `/api/v1/licenses` | Compliance (+ COA `/pdf`) |
+| GET/POST | `/api/v1/deliveries`, `/api/v1/drivers`, `/api/v1/vehicles` | Logistics |
+| GET/POST | `/api/v1/tasks` | Tasks |
+| GET | `/api/v1/reports/{name}` | The report registry (about two dozen reports) |
+| GET | `/api/v1/metrc/...` | Read-only Metrc mirror (packages, transfers, tags, ...) |
+| GET | `/api/v1/locations`, `/api/v1/unit-types` | Reference data |
 
 Orders and invoices carry a full money breakdown (`subtotal` / `charge_total` / `discount_total` / `tax_total` / `total`) with a `charges` collection (FEE/DISCOUNT/SHIPPING/TAX); `custom_data` and `tags` are accepted across products, companies, orders, invoices, and contacts.
 

@@ -92,6 +92,12 @@ export const deliveryRoutes = pgTable(
     driverId: uuid("driver_id").references(() => drivers.id, { onDelete: "set null" }),
     vehicleId: uuid("vehicle_id").references(() => vehicles.id, { onDelete: "set null" }),
     routeDate: date("route_date"),
+    // Real-time run schedule: when the driver leaves the depot and when the whole
+    // run (all drops + return) is planned to finish. The dispatch map derives each
+    // vehicle's live position, status, and drop times from the current wall-clock
+    // time against this window - so the day progresses on its own, in real time.
+    departureAt: timestamp("departure_at", { withTimezone: true }),
+    completeAt: timestamp("complete_at", { withTimezone: true }),
     notes: text(),
     ...timestamps(),
   },
@@ -139,71 +145,26 @@ export const deliveries = pgTable(
 );
 
 /**
- * Live movement state of a vehicle on the dispatch map:
- *  - IDLE: parked at the depot, nothing to run.
- *  - EN_ROUTE: driving toward its current delivery stop.
- *  - STOPPED: paused at a stop (dropping off / loading).
- *  - RETURNING: heading back to the depot after the last stop.
+ * Persistent cache of road geometry from the routing provider, keyed by a hash of
+ * the ordered waypoints (depot -> stops -> depot). A dispatch day has stable stop
+ * sequences, so each run's real-street path is fetched once and reused by every
+ * telemetry read and simulate tick - and, crucially, warmed at seed time - so a
+ * fleet of dozens of trucks never triggers a burst of live directions calls on a
+ * page load. Org-scoped (coords are the key, but scoping keeps tenants isolated).
  */
-export const telemetryStatus = pgEnum("telemetry_status", [
-  "IDLE",
-  "EN_ROUTE",
-  "STOPPED",
-  "RETURNING",
-]);
-
-/**
- * The last-known ping for a vehicle - one row per vehicle (upserted in place).
- * This is the "current position" the dispatch map plots and tweens from; the
- * simulator advances it a step at a time toward the current delivery's coords.
- * A lean `telemetry_pings` history (below) records the trail for realism.
- */
-export const vehicleTelemetry = pgTable(
-  "vehicle_telemetry",
+export const routeGeometryCache = pgTable(
+  "route_geometry_cache",
   {
     id: pk(),
     organizationId: uuid()
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
-    vehicleId: uuid("vehicle_id")
-      .notNull()
-      .references(() => vehicles.id, { onDelete: "cascade" }),
-    lat: numeric({ precision: 10, scale: 6 }).notNull(),
-    lng: numeric({ precision: 10, scale: 6 }).notNull(),
-    speedMph: numeric("speed_mph", { precision: 6, scale: 2 }).notNull().default("0"),
-    headingDeg: integer("heading_deg").notNull().default(0),
-    status: telemetryStatus().notNull().default("IDLE"),
-    // The stop this vehicle is currently driving toward (null when idle/returning).
-    currentDeliveryId: uuid("current_delivery_id").references(() => deliveries.id, {
-      onDelete: "set null",
-    }),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    // Hash of the rounded waypoint list; unique per org.
+    cacheKey: text("cache_key").notNull(),
+    // The provider's RouteResult: { geometry: [lng,lat][], legs: [{geometry,...}] }.
+    result: jsonb().$type<unknown>().notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex("vehicle_telemetry_vehicle_uq").on(t.organizationId, t.vehicleId)],
+  (t) => [uniqueIndex("route_geometry_cache_org_key_uq").on(t.organizationId, t.cacheKey)],
 );
 
-/**
- * Append-only trail of vehicle pings (kept lean - one row per simulated tick).
- * Not required to render the map (that reads the latest ping from
- * vehicle_telemetry), but gives the movement a real history to draw a breadcrumb
- * from and proves the day actually "happened".
- */
-export const telemetryPings = pgTable(
-  "telemetry_pings",
-  {
-    id: pk(),
-    organizationId: uuid()
-      .notNull()
-      .references(() => organization.id, { onDelete: "cascade" }),
-    vehicleId: uuid("vehicle_id")
-      .notNull()
-      .references(() => vehicles.id, { onDelete: "cascade" }),
-    lat: numeric({ precision: 10, scale: 6 }).notNull(),
-    lng: numeric({ precision: 10, scale: 6 }).notNull(),
-    speedMph: numeric("speed_mph", { precision: 6, scale: 2 }).notNull().default("0"),
-    headingDeg: integer("heading_deg").notNull().default(0),
-    recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => [index("telemetry_pings_vehicle_idx").on(t.organizationId, t.vehicleId, t.recordedAt)],
-);

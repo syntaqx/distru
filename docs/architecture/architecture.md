@@ -16,7 +16,7 @@ This project is deliberately **two pieces**, and they are separated in the code,
 flowchart TB
   subgraph Faces ["Faces (how work enters)"]
     UI[Web UI]
-    REST[Public REST API - 150 routes]
+    REST[Public REST API - 152 routes]
     MCP[MCP server - ~80 tools]
     Bulk[Bulk uploader]
     Hooks[HMAC webhooks - outbound]
@@ -64,7 +64,7 @@ flowchart TB
 
 ## The organizing idea: one domain, many faces
 
-A single **org-scoped domain layer** is the source of truth, and every way work enters is a thin adapter over it: the web UI, the public REST API (**150 documented routes**, drift-guarded on every build), the MCP server (**~80 tools** covering the whole domain, derived from the Copilot's own tools), the bulk `/upload-products` uploader, outbound **HMAC-signed webhooks**, and the Copilot. There is exactly one place that knows how to create a product, so chat, the API, and imports never disagree. Adding a capability is one module function plus thin wrappers. The API is also browsable in-app through an interactive **API Reference explorer** at `/api-reference`.
+A single **org-scoped domain layer** is the source of truth, and every way work enters is a thin adapter over it: the web UI, the public REST API (**152 documented routes**, drift-guarded on every build), the MCP server (**~80 tools** covering the whole domain, derived from the Copilot's own tools), the bulk `/upload-products` uploader, outbound **HMAC-signed webhooks**, and the Copilot. There is exactly one place that knows how to create a product, so chat, the API, and imports never disagree. Adding a capability is one module function plus thin wrappers. The API is also browsable in-app through an interactive **API Reference explorer** at `/api-reference`.
 
 ## The two pieces, in code
 

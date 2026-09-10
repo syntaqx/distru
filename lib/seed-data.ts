@@ -1,6 +1,15 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
-import { artifacts, unitTypes, user, workflowRuns, workflows } from "@/db/schema";
+import {
+  artifacts,
+  deliveries as deliveriesTable,
+  deliveryRoutes as deliveryRoutesTable,
+  locations as locationsTable,
+  unitTypes,
+  user,
+  workflowRuns,
+  workflows,
+} from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { systemCtx } from "@/lib/modules/shared";
 import { listProducts } from "@/lib/modules/catalog";
@@ -12,7 +21,7 @@ import {
   runReport,
 } from "@/lib/modules/reports";
 import { createNotification } from "@/lib/modules/notifications";
-import { getConnection, runMockSync } from "@/lib/modules/platform";
+import { configureProvider, getConnection, runMockSync } from "@/lib/modules/platform";
 import { listOrgMembers, listTasks, upsertTask } from "@/lib/modules/platform";
 import { ensureDriverProfile, upsertMembership } from "@/lib/modules/platform";
 import {
@@ -47,16 +56,16 @@ import { addCompanyNote, listCompanyNotes } from "@/lib/modules/catalog";
 import { createOrder, listOrders } from "@/lib/modules/sales";
 import {
   advanceDeliveryStatus,
+  AUSTIN_BOUNDS,
   AUSTIN_DEPOT,
   createDeliveryFromOrder,
-  getTelemetryByVehicle,
   listDeliveries,
   listDrivers,
   listVehicles,
   upsertDriver,
   upsertRoute,
-  upsertTelemetry,
   upsertVehicle,
+  warmRunGeometry,
 } from "@/lib/modules/logistics";
 import { createInvoiceForOrder, recordPayment } from "@/lib/modules/sales";
 import { listStrains, upsertStrain } from "@/lib/modules/catalog";
@@ -178,8 +187,9 @@ export async function provisionOrgSampleData(orgId: string) {
     const instruction =
       "Find every active product with on-hand below 25 units and list them with " +
       "their SKU and current on-hand, lowest first, as a markdown table. Then call " +
-      "save_report to save it (title 'Low-stock report - <today>'). Read-only; do " +
-      "not change any data. If an email recipient is configured, email it with email_report.";
+      "save_report to save it (title 'Low-stock report - <today>'), and email it to " +
+      "ops@greenleaf.test with email_report. Read-only; do not change any data. If " +
+      "no email integration is connected, save the report and stop.";
     await createWorkflow(ctx, {
       name: "Low-stock report",
       instruction,
@@ -213,11 +223,19 @@ export async function provisionOrgSampleData(orgId: string) {
             params: { tool: "save_report" },
             position: { x: 520, y: 380 },
           },
+          {
+            id: "tool_email",
+            type: "tool",
+            name: "email_report",
+            params: { tool: "email_report" },
+            position: { x: 680, y: 380 },
+          },
         ],
         connections: {
           trigger: { main: [[{ node: "agent" }]] },
           tool_inv: { ai_tool: [[{ node: "agent" }]] },
           tool_save: { ai_tool: [[{ node: "agent" }]] },
+          tool_email: { ai_tool: [[{ node: "agent" }]] },
         },
       },
     });
@@ -330,12 +348,31 @@ async function seedScheduledAssemblies(ctx: ReturnType<typeof systemCtx>) {
 }
 
 /**
- * Mark QuickBooks + Metrc as connected and run a mock sync for each, so the
- * Integrations settings screen shows connected providers, last-synced times, and
- * a populated sync-activity feed. Idempotent: skips once a connection exists.
+ * Set up QuickBooks + Metrc with demo credentials (which auto-connects them) and
+ * run a mock sync for each, so the Integrations screen shows two *configured,
+ * connected* providers with last-synced times and a populated sync-activity
+ * feed - while the rest sit at "Setup required" to demonstrate the setup gate.
+ * The credentials are obviously fake; they exist so the demo shows the connected
+ * state a real tenant would reach after entering their own. Idempotent: skips
+ * once a connection exists.
  */
 async function seedIntegrations(ctx: ReturnType<typeof systemCtx>) {
   if (await getConnection(ctx, "quickbooks")) return;
+  // `__demo` keeps these on the believable mock sync path (the creds are fake).
+  // A real tenant entering real credentials in the UI omits it -> live adapter.
+  await configureProvider(ctx, "quickbooks", {
+    __demo: true,
+    environment: "production",
+    realmId: "4620816365200000000",
+    clientId: "ABxDemoClientId0000000000000000",
+    clientSecret: "demo-secret-not-a-real-key",
+  });
+  await configureProvider(ctx, "metrc", {
+    __demo: true,
+    state: "ca",
+    vendorKey: "demo-vendor-key-0000",
+    userKey: "demo-user-key-0000",
+  });
   await runMockSync(ctx, "quickbooks");
   await runMockSync(ctx, "metrc");
 }
@@ -771,8 +808,11 @@ async function seedDeliveries(ctx: ReturnType<typeof systemCtx>) {
     })
   ).row;
 
-  // Deliveries are scheduled for today so the manifest lights up out of the box.
+  // Scheduled for TOMORROW: today's live dispatch is owned by seedDispatch's
+  // real-time runs, so this Deliveries-tab demo sits a day out to avoid colliding
+  // with a driver's scheduled run (which would merge into one route).
   const today = new Date();
+  today.setDate(today.getDate() + 1);
   today.setHours(9, 0, 0, 0);
   const at = (hour: number) => {
     const d = new Date(today);
@@ -926,201 +966,219 @@ async function seedGrowCompliance(ctx: ReturnType<typeof systemCtx>) {
 }
 
 /**
- * Seed a real-feeling Austin, TX operating day for the DISPATCH board:
- *  - a central depot and two vans (with depot base coords) + their drivers,
- *  - TODAY's run: a couple of stops already DELIVERED this morning and a couple
- *    OUT_FOR_DELIVERY with each van mid-route toward its current stop, and
- *  - TOMORROW's run: ASSIGNED stops scheduled but not yet started,
- * every stop with a plausible Austin street address + coordinates, and a
- * last-known telemetry ping per van so the map is "live" the instant it loads.
- * Idempotent: skips once any telemetry exists. Uses relative dates (today /
- * tomorrow) so a nightly reseed always produces a fresh day.
+ * Seed a real-time Austin, TX operating day for the DISPATCH board: a small,
+ * legible fleet of 10 drivers + vans, each on a clustered multi-stop run with a
+ * real schedule (a morning departure and an afternoon completion). Nothing is
+ * pre-marked delivered and no positions are stored - the dispatch map derives
+ * every vehicle's live position, status, ETA, and drop times from the current
+ * wall-clock time against each run's window, so the day plays out on its own in
+ * real time (early morning: still loading; midday: mid-route; evening: all done).
+ * Also seeds the configurable depot as a real `locations` row. Street geometry is
+ * warmed into the cache so the first load is instant. Deterministic + idempotent.
  */
 async function seedDispatch(ctx: ReturnType<typeof systemCtx>) {
-  if ((await getTelemetryByVehicle(ctx)).size > 0) return;
+  // Idempotent: skip once the day's scheduled runs exist.
+  const already = await db
+    .select({ id: deliveryRoutesTable.id })
+    .from(deliveryRoutesTable)
+    .where(and(eq(deliveryRoutesTable.organizationId, ctx.orgId), isNotNull(deliveryRoutesTable.departureAt)))
+    .limit(1);
+  if (already.length > 0) return;
 
-  // Reuse any driver/vehicle a prior seed step already created (both are unique
-  // by org+name), otherwise create - so seedDispatch composes with seedDeliveries
-  // instead of colliding on a shared name (e.g. "Marcus Reyes").
-  const existingVehicles = (await listVehicles(ctx, { limit: 200 })).items;
-  const existingDriversList = (await listDrivers(ctx, { limit: 200 })).items;
-  const findOrCreateVehicle = async (input: Parameters<typeof upsertVehicle>[1]) => {
-    const found = existingVehicles.find((v) => v.name === input.name);
-    if (found) return found;
-    const { row } = await upsertVehicle(ctx, input);
-    existingVehicles.push(row);
-    return row;
+  // Deterministic RNG so every reseed produces the same believable day.
+  let seed = 0x1a2b3c4d;
+  const rnd = () => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return seed / 0xffffffff;
   };
-  const findOrCreateDriver = async (input: Parameters<typeof upsertDriver>[1]) => {
-    const found = existingDriversList.find((d) => d.name === input.name);
-    if (found) return found;
-    const { row } = await upsertDriver(ctx, input);
-    existingDriversList.push(row);
-    return row;
-  };
+  const pick = <T>(arr: readonly T[]): T => arr[Math.floor(rnd() * arr.length)];
+  const range = (min: number, max: number) => min + rnd() * (max - min);
+  const int = (min: number, max: number) => Math.floor(range(min, max + 1));
 
-  // Two vans, homed at the Austin depot.
-  const vanA = await findOrCreateVehicle({
-    name: "Cargo Van 12",
-    make: "Ford",
-    model: "Transit 250",
-    licensePlate: "ATX-1120",
-    lat: AUSTIN_DEPOT.lat,
-    lng: AUSTIN_DEPOT.lng,
-  });
-  const vanB = await findOrCreateVehicle({
-    name: "Sprinter 08",
-    make: "Mercedes-Benz",
-    model: "Sprinter 2500",
-    licensePlate: "ATX-0842",
-    lat: AUSTIN_DEPOT.lat,
-    lng: AUSTIN_DEPOT.lng,
-  });
-
-  const driverA = await findOrCreateDriver({
-    name: "Alicia Nguyen",
-    phone: "(512) 555-0148",
-    licenseNumber: "TX-8841203",
-  });
-  const driverB = await findOrCreateDriver({
-    name: "Marcus Reyes",
-    phone: "(512) 555-0180",
-    licenseNumber: "TX-4471902",
-  });
-
-  // Local-day helpers (relative dates so every reseed is a fresh day).
-  const at = (dayOffset: number, hour: number, minute = 0) => {
+  // Local-day helper (relative dates so every reseed is a fresh day).
+  const at = (hour: number, minute = 0) => {
     const d = new Date();
-    d.setDate(d.getDate() + dayOffset);
     d.setHours(hour, minute, 0, 0);
     return d;
   };
-  const dayStr = (dayOffset: number) => {
-    const d = new Date();
-    d.setDate(d.getDate() + dayOffset);
-    return d.toISOString().slice(0, 10);
-  };
+  const dayStr = () => new Date().toISOString().slice(0, 10);
 
-  const routeToday = (
-    await upsertRoute(ctx, {
-      name: `${dayStr(0)} - Austin Metro`,
-      driverId: driverA.id,
-      vehicleId: vanA.id,
-      routeDate: dayStr(0),
-      notes: "Central + east Austin dispensary run.",
+  // Seed the depot as a real, editable location (this is where it's configured).
+  await db
+    .insert(locationsTable)
+    .values({
+      organizationId: ctx.orgId,
+      name: "Austin Depot",
+      address: "Downtown Austin, TX 78701",
+      lat: AUSTIN_DEPOT.lat.toFixed(6),
+      lng: AUSTIN_DEPOT.lng.toFixed(6),
+      isDepot: true,
     })
-  ).row;
-  const routeTomorrow = (
-    await upsertRoute(ctx, {
-      name: `${dayStr(1)} - Austin Metro`,
-      driverId: driverB.id,
-      vehicleId: vanB.id,
-      routeDate: dayStr(1),
-      notes: "North + west Austin dispensary run.",
-    })
-  ).row;
+    .onConflictDoNothing();
 
-  type Stop = {
-    tag: string;
-    customer: string;
-    line1: string;
-    postal: string;
-    lat: number;
-    lng: number;
-    sku: string;
-    qty: number;
-    when: Date;
-    sequence: number;
-    driverId: string;
-    vehicleId: string;
-    routeId: string;
-    target: "DELIVERED" | "OUT_FOR_DELIVERY" | "ASSIGNED";
-  };
-
-  const stops: Stop[] = [
-    // ---- Van A, today ----
-    { tag: "a1", customer: "Congress Ave Cannabis", line1: "1519 S Congress Ave", postal: "78704", lat: 30.25, lng: -97.75, sku: "ED-GUM-100", qty: 6, when: at(0, 9), sequence: 1, driverId: driverA.id, vehicleId: vanA.id, routeId: routeToday.id, target: "DELIVERED" },
-    { tag: "a2", customer: "East Side Botanicals", line1: "1000 E 6th St", postal: "78702", lat: 30.266, lng: -97.733, sku: "PR-SD-1", qty: 10, when: at(0, 11), sequence: 2, driverId: driverA.id, vehicleId: vanA.id, routeId: routeToday.id, target: "OUT_FOR_DELIVERY" },
-    { tag: "a3", customer: "Mueller Green Room", line1: "1911 Aldrich St", postal: "78723", lat: 30.298, lng: -97.705, sku: "VP-DISP-05", qty: 8, when: at(0, 13), sequence: 3, driverId: driverA.id, vehicleId: vanA.id, routeId: routeToday.id, target: "OUT_FOR_DELIVERY" },
-    // ---- Van B, today ----
-    { tag: "b1", customer: "Zilker Wellness", line1: "2201 Barton Springs Rd", postal: "78746", lat: 30.264, lng: -97.771, sku: "ED-CHOC-100", qty: 5, when: at(0, 10), sequence: 1, driverId: driverB.id, vehicleId: vanB.id, routeId: routeToday.id, target: "DELIVERED" },
-    { tag: "b2", customer: "North Lamar Dispensary", line1: "5601 N Lamar Blvd", postal: "78751", lat: 30.323, lng: -97.725, sku: "FL-BD-35", qty: 4, when: at(0, 12), sequence: 2, driverId: driverB.id, vehicleId: vanB.id, routeId: routeToday.id, target: "OUT_FOR_DELIVERY" },
-    // ---- Tomorrow (assigned, not yet started) ----
-    { tag: "t1", customer: "Domain Collective", line1: "11410 Century Oaks Ter", postal: "78758", lat: 30.401, lng: -97.725, sku: "VP-LR-1", qty: 6, when: at(1, 10), sequence: 1, driverId: driverA.id, vehicleId: vanA.id, routeId: routeTomorrow.id, target: "ASSIGNED" },
-    { tag: "t2", customer: "Westlake Remedies", line1: "3300 Bee Cave Rd", postal: "78746", lat: 30.279, lng: -97.8, sku: "FL-OG-35", qty: 3, when: at(1, 11), sequence: 2, driverId: driverB.id, vehicleId: vanB.id, routeId: routeTomorrow.id, target: "ASSIGNED" },
+  // ---- Name + place pools --------------------------------------------------
+  const FIRST = [
+    "Alicia", "Marcus", "Priya", "Diego", "Hannah", "Tyrell", "Sofia", "Liam", "Noor", "Grace",
+    "Elena", "Jamal", "Wei", "Carlos", "Aisha", "Owen", "Maya", "Ravi", "Nadia", "Cole",
+  ] as const;
+  const LAST = [
+    "Nguyen", "Reyes", "Patel", "Okafor", "Kim", "Alvarez", "Brooks", "Santos", "Duval", "Ford",
+    "Cho", "Mercado", "Ellis", "Haddad", "Novak", "Bauer", "Ramos", "Whitfield", "Osei", "Lang",
+  ] as const;
+  const MAKES: readonly [string, string][] = [
+    ["Ford", "Transit 250"],
+    ["Mercedes-Benz", "Sprinter 2500"],
+    ["Ram", "ProMaster 1500"],
+    ["Ford", "Transit 350"],
+    ["Chevrolet", "Express 2500"],
+    ["Rivian", "EDV 700"],
+  ];
+  const BIZ_A = [
+    "Congress", "East Side", "Zilker", "Mueller", "North Lamar", "Domain", "Westlake", "Barton",
+    "Rainey", "Clarksville", "Hyde Park", "Bouldin", "Travis Heights", "Cherrywood", "Allandale",
+    "Crestview", "Windsor", "Manor", "Riverside", "Oltorf",
+  ] as const;
+  const BIZ_B = [
+    "Cannabis Co.", "Botanicals", "Wellness", "Green Room", "Dispensary", "Collective", "Remedies",
+    "Provisions", "Apothecary", "Gardens", "Reserve", "Supply", "Leaf & Co.", "Holistics",
+  ] as const;
+  const STREETS = [
+    "Congress Ave", "S Lamar Blvd", "N Lamar Blvd", "Guadalupe St", "E 6th St", "W 5th St",
+    "Barton Springs Rd", "S 1st St", "Manor Rd", "Airport Blvd", "Cesar Chavez St", "Burnet Rd",
+    "Anderson Ln", "Riverside Dr", "William Cannon Dr", "Slaughter Ln", "Parmer Ln", "Bee Cave Rd",
+  ] as const;
+  const CLUSTERS: readonly { lat: number; lng: number; postal: string }[] = [
+    { lat: 30.250, lng: -97.750, postal: "78704" },
+    { lat: 30.267, lng: -97.734, postal: "78702" },
+    { lat: 30.264, lng: -97.771, postal: "78746" },
+    { lat: 30.298, lng: -97.705, postal: "78723" },
+    { lat: 30.323, lng: -97.725, postal: "78751" },
+    { lat: 30.401, lng: -97.725, postal: "78758" },
+    { lat: 30.228, lng: -97.790, postal: "78745" },
+    { lat: 30.285, lng: -97.807, postal: "78746" },
+    { lat: 30.352, lng: -97.680, postal: "78724" },
+    { lat: 30.240, lng: -97.700, postal: "78741" },
   ];
 
-  const deliveryIdByTag = new Map<string, string>();
-  for (const s of stops) {
-    const product = await getProductBySku(ctx, s.sku);
-    if (!product) continue;
-    const customer = await findOrCreateCustomer(ctx, s.customer);
-    const address = { line1: s.line1, city: "Austin", state: "TX", postal_code: s.postal, country: "US" };
-    // A backing order so the stop carries a real order number + customer, then a
-    // delivery snapshotting that address with its destination coordinates.
-    const order = await createOrder(ctx, {
-      customerId: customer.id,
-      status: "PROCESSING",
-      shippingAddress: address,
-      items: [
-        {
-          productId: product.product.id,
-          sku: product.product.sku,
-          name: product.product.name,
-          quantity: s.qty,
-          unitPrice: Number(product.product.unitPrice ?? 0),
-        },
-      ],
-    });
-    const { row } = await createDeliveryFromOrder(ctx, {
-      orderId: order.order.id,
-      driverId: s.driverId,
-      vehicleId: s.vehicleId,
-      routeId: s.routeId,
-      sequence: s.sequence,
-      scheduledAt: s.when,
-      address,
-      lat: s.lat,
-      lng: s.lng,
-    });
-    // createDeliveryFromOrder lands ASSIGNED (a driver was given); advance today's.
-    if (s.target === "OUT_FOR_DELIVERY") await advanceDeliveryStatus(ctx, row.id, "OUT_FOR_DELIVERY");
-    else if (s.target === "DELIVERED") await advanceDeliveryStatus(ctx, row.id, "DELIVERED");
-    deliveryIdByTag.set(s.tag, row.id);
+  const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+
+  // ---- Fleet: 10 drivers + vans (reuse any existing, top up to 10) ---------
+  const FLEET_SIZE = 10;
+  const existingVehicles = (await listVehicles(ctx, { limit: 200 })).items;
+  const existingDrivers = (await listDrivers(ctx, { limit: 200 })).items;
+  const usedVehicleNames = new Set(existingVehicles.map((v) => v.name));
+  const usedDriverNames = new Set(existingDrivers.map((d) => d.name));
+  const vans = [...existingVehicles];
+  const drvs = [...existingDrivers];
+
+  let vseq = 1;
+  while (vans.length < FLEET_SIZE) {
+    let name = `Van ${String(vseq).padStart(2, "0")}`;
+    while (usedVehicleNames.has(name)) name = `Van ${String(++vseq).padStart(2, "0")}`;
+    usedVehicleNames.add(name);
+    const [make, model] = MAKES[vseq % MAKES.length];
+    const { row } = await upsertVehicle(ctx, { name, make, model, licensePlate: `ATX-${1000 + vans.length}`, lat: AUSTIN_DEPOT.lat, lng: AUSTIN_DEPOT.lng });
+    vans.push(row);
+    vseq++;
+  }
+  while (drvs.length < FLEET_SIZE) {
+    let name = `${pick(FIRST)} ${pick(LAST)}`;
+    let tries = 0;
+    while (usedDriverNames.has(name) && tries++ < 60) name = `${pick(FIRST)} ${pick(LAST)}`;
+    if (usedDriverNames.has(name)) name = `${name} ${drvs.length}`;
+    usedDriverNames.add(name);
+    const { row } = await upsertDriver(ctx, { name, phone: `(512) 555-${String(2000 + drvs.length).slice(-4)}`, licenseNumber: `TX-${3000000 + drvs.length * 137}` });
+    drvs.push(row);
   }
 
-  // Rough compass bearing (0=N, 90=E) between two points, for a realistic heading.
-  const bearing = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
-    const midLat = ((a.lat + b.lat) / 2) * (Math.PI / 180);
-    const dx = (b.lng - a.lng) * Math.cos(midLat);
-    const dy = b.lat - a.lat;
-    return Math.round(((Math.atan2(dx, dy) * 180) / Math.PI + 360) % 360);
-  };
-  const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+  // ---- Generate each driver's scheduled run --------------------------------
+  const warmJobs: { stops: { id: string; lat: number; lng: number }[] }[] = [];
 
-  // Place each van mid-route toward its CURRENT out-for-delivery stop, with the
-  // matching heading + a plausible speed, so the map reads as genuinely en route.
-  const vanARoute = { lat: 30.266, lng: -97.733 }; // toward East Side Botanicals (a2)
-  await upsertTelemetry(ctx, {
-    vehicleId: vanA.id,
-    lat: lerp(AUSTIN_DEPOT.lat, vanARoute.lat, 0.55),
-    lng: lerp(AUSTIN_DEPOT.lng, vanARoute.lng, 0.55),
-    speedMph: 21,
-    headingDeg: bearing(AUSTIN_DEPOT, vanARoute),
-    status: "EN_ROUTE",
-    currentDeliveryId: deliveryIdByTag.get("a2") ?? null,
-    recordPing: true,
-  });
+  for (let i = 0; i < FLEET_SIZE; i++) {
+    const van = vans[i];
+    const drv = drvs[i];
+    const cluster = CLUSTERS[i % CLUSTERS.length];
+    // A real route is dense: ~12-18 drops. With a realistic ~30 min per drop
+    // (drive + drop-off), a run spans most of the working day, so trucks move at
+    // a believable crawl and the day genuinely progresses stop by stop.
+    const stopCount = int(12, 18);
+    const slotMin = int(26, 34); // minutes per stop (drive + drop-off)
 
-  const vanBRoute = { lat: 30.323, lng: -97.725 }; // toward North Lamar Dispensary (b2)
-  await upsertTelemetry(ctx, {
-    vehicleId: vanB.id,
-    lat: lerp(AUSTIN_DEPOT.lat, vanBRoute.lat, 0.45),
-    lng: lerp(AUSTIN_DEPOT.lng, vanBRoute.lng, 0.45),
-    speedMph: 27,
-    headingDeg: bearing(AUSTIN_DEPOT, vanBRoute),
-    status: "EN_ROUTE",
-    currentDeliveryId: deliveryIdByTag.get("b2") ?? null,
-    recordPing: true,
-  });
+    // Staggered morning departures; completion falls out of the stop count so the
+    // pacing stays realistic (departure + one slot per stop + a return leg).
+    const departure = at(7, 30 + i * 16); // 7:30 ... ~10:00
+    const complete = new Date(departure.getTime() + (stopCount + 1) * slotMin * 60_000);
+
+    const raw = Array.from({ length: stopCount }, () => ({
+      lat: clamp(cluster.lat + range(-0.028, 0.028), AUSTIN_BOUNDS.south, AUSTIN_BOUNDS.north),
+      lng: clamp(cluster.lng + range(-0.032, 0.032), AUSTIN_BOUNDS.west, AUSTIN_BOUNDS.east),
+    }));
+    raw.sort((a, b) => {
+      const da = (a.lat - AUSTIN_DEPOT.lat) ** 2 + (a.lng - AUSTIN_DEPOT.lng) ** 2;
+      const db2 = (b.lat - AUSTIN_DEPOT.lat) ** 2 + (b.lng - AUSTIN_DEPOT.lng) ** 2;
+      return da - db2;
+    });
+
+    // Even drop times across the run window, so scheduledAt reads like a plan.
+    const span = complete.getTime() - departure.getTime();
+    const slot = span / (stopCount + 1);
+
+    const route = (
+      await upsertRoute(ctx, {
+        name: `${dayStr()} - ${drv.name.split(" ")[0]}'s run`,
+        driverId: drv.id,
+        vehicleId: van.id,
+        routeDate: dayStr(),
+        notes: `${stopCount} stops - ${cluster.postal} area.`,
+      })
+    ).row;
+    // Stamp the schedule window on the route (the real-time sim reads this).
+    await db
+      .update(deliveryRoutesTable)
+      .set({ departureAt: departure, completeAt: complete })
+      .where(eq(deliveryRoutesTable.id, route.id));
+
+    const values = raw.map((p, idx) => {
+      const name = `${pick(BIZ_A)} ${pick(BIZ_B)}`;
+      return {
+        organizationId: ctx.orgId,
+        orderId: null,
+        routeId: route.id,
+        driverId: drv.id,
+        vehicleId: van.id,
+        status: "ASSIGNED" as const,
+        address: {
+          name,
+          line1: `${int(100, 9899)} ${pick(STREETS)}`,
+          city: "Austin",
+          state: "TX",
+          postal_code: cluster.postal,
+          country: "US",
+        },
+        lat: p.lat.toFixed(6),
+        lng: p.lng.toFixed(6),
+        sequence: idx + 1,
+        scheduledAt: new Date(departure.getTime() + (idx + 1) * slot),
+        deliveredAt: null,
+      };
+    });
+
+    const inserted = await db
+      .insert(deliveriesTable)
+      .values(values)
+      .returning({ id: deliveriesTable.id, lat: deliveriesTable.lat, lng: deliveriesTable.lng, sequence: deliveriesTable.sequence });
+
+    warmJobs.push({
+      stops: inserted
+        .slice()
+        .sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0))
+        .map((d) => ({ id: d.id, lat: Number(d.lat), lng: Number(d.lng) })),
+    });
+  }
+
+  // Warm real street geometry for every run into the persistent cache.
+  const CONCURRENCY = 5;
+  for (let i = 0; i < warmJobs.length; i += CONCURRENCY) {
+    await Promise.all(warmJobs.slice(i, i + CONCURRENCY).map((j) => warmRunGeometry(ctx, AUSTIN_DEPOT, j.stops)));
+  }
 }

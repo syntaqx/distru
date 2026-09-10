@@ -135,6 +135,13 @@ export const locations = pgTable(
       .notNull()
       .references(() => organization.id, { onDelete: "cascade" }),
     name: text().notNull(),
+    // Physical address + coordinates. Coordinates make a location mappable; the
+    // one flagged `isDepot` is the fleet's home base that the dispatch map centers
+    // on and that every delivery run departs from and returns to.
+    address: text(),
+    lat: numeric({ precision: 10, scale: 6 }),
+    lng: numeric({ precision: 10, scale: 6 }),
+    isDepot: boolean("is_depot").notNull().default(false),
     ...timestamps(),
   },
   (t) => [uniqueIndex("locations_org_name_uq").on(t.organizationId, t.name)],

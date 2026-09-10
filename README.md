@@ -10,23 +10,18 @@ A multitenant, Vercel-deployable recreation of the [Distru](https://distru.com) 
 
 ## Quickstart
 
-### Docker (one command)
+**Preferred: run Node on the host, Postgres in Docker.** The dev server runs
+natively (Turbopack + real filesystem events), so HMR is fast — an in-container
+dev server crawls because the Windows↔WSL2 bind mount taxes every file read and
+watch event. `docker compose up -d` starts **only Postgres**, leaving port 3000
+free for the host dev server.
 
 ```bash
 cp .env.example .env            # set ANTHROPIC_API_KEY (one may already be present)
-docker compose up -d --build    # app + Postgres, pushes schema, seeds, runs dev
-```
-
-App at **http://localhost:3000** (first boot ~a minute to build). Logs: `docker compose logs -f app` · stop: `docker compose down`.
-
-### Host (Node local, Postgres in Docker)
-
-```bash
-cp .env.example .env
 npm install
-docker compose up -d postgres   # database only, on :5432
-npm run db:push && npm run db:seed
-npm run dev
+docker compose up -d            # Postgres only, on :5432 (the app is opt-in — see below)
+npm run dev:setup               # first run only: push schema + seed the demo tenant
+npm run dev                     # http://localhost:3000
 ```
 
 Sign in with the seeded demo tenant (pre-filled on the login page):
@@ -36,6 +31,50 @@ demo@distru.test / distru1234
 ```
 
 New sign-ups get their own seeded workspace too.
+
+---
+
+## Local development
+
+### The two run modes
+
+| Mode | Command | Use it for |
+|---|---|---|
+| **Host app + Docker DB** _(preferred)_ | `docker compose up -d` → `npm run dev` | day-to-day dev — fast Turbopack HMR |
+| **Everything in Docker** | `docker compose --profile app up -d --build` | no host Node, or reproducing the container build |
+
+The `app` service sits behind the `app` compose **profile**, so a plain
+`docker compose up -d` never binds port 3000 — it's reserved for `npm run dev`.
+Postgres always runs and exposes `:5432`; the host app reaches it over
+`localhost:5432` (see `.env.example`), while the containerized app reaches it
+over the compose network (`postgres:5432`, overridden in `compose.yml`). The two
+never fight over a port.
+
+> **Profile gotcha:** profile-gated services are invisible to profile-less
+> compose commands, so a plain `docker compose down` / `stop` will **not** stop a
+> running containerized app. Stop it with `docker compose --profile app down`
+> (or `docker rm -f distru-app`). Full-Docker logs: `docker compose logs -f app`.
+
+### Common commands
+
+```bash
+npm run dev            # dev server (Turbopack) on :3000
+npm run dev:setup      # push schema + seed the demo tenant (first run / after a wipe)
+npm run db:push        # apply schema changes to the DB (drizzle-kit push)
+npm run db:seed        # (re)seed the demo tenant — idempotent
+npm run db:reset       # wipe every table and reseed from scratch
+npm run db:studio      # browse the DB (Drizzle Studio)
+npm run lint           # eslint
+npm run typecheck      # tsc --noEmit  (runs build:docs first via CI; locally it's already generated)
+npm run test           # vitest
+```
+
+### Why the first hit of a page is slow (and the rest aren't)
+
+Next compiles each route the **first** time you visit it in dev, so that first
+load can take a second or two while everything after is ~100ms — normal dev
+behavior, not a bug (production builds are fully precompiled). If it's _really_
+slow, you're running the app inside Docker; switch to the host run mode above.
 
 ---
 
@@ -58,7 +97,7 @@ npm run smoke     # drives the service layer + full import pipeline against Post
 Then hit the faces with that token (`TOKEN=dk_live_…`):
 
 ```bash
-curl -H "Authorization: Bearer $TOKEN" http://localhost:3000/public/v1/products      # Distru-shaped REST API
+curl -H "Authorization: Bearer $TOKEN" http://localhost:3000/api/v1/products      # Distru-shaped REST API
 curl -X POST http://localhost:3000/api/mcp -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'                                # MCP server
 curl -X POST http://localhost:3000/api/upload-products -H "Authorization: Bearer $TOKEN" \
@@ -113,7 +152,7 @@ Optional: `ANTHROPIC_MODEL` (default `claude-opus-5`), `MODEL_PROVIDER=openai` +
 ## Project layout
 
 ```text
-app/            Next routes — (auth) + (app) UI, /api/*, the public API under /public/v1/*, /docs
+app/            Next routes — (auth) + (app) UI, /api/*, the public API under /api/v1/*, /docs
 components/     UI — the app chrome + the Copilot window (components/chat/*)
 db/schema/      Drizzle schema by owning module (catalog, inventory, sales, compliance, …)
 lib/

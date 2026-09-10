@@ -26,6 +26,13 @@ services:
   app:
     build: .
     container_name: distru-app
+    # The app is behind the "app" profile, so it does NOT start with a plain
+    # `docker compose up -d` - that brings up only Postgres (5432 exposed), which
+    # is the fast local workflow: run the Next dev server natively on the host
+    # (`npm run dev`) instead of in Docker, where the Windows<->WSL2 bind mount
+    # makes file-watch/HMR crawl. Start the fully-containerized app when you want
+    # it with:  docker compose --profile app up -d --build
+    profiles: ["app"]
     depends_on:
       postgres:
         condition: service_healthy

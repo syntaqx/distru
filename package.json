@@ -6,8 +6,9 @@
     "node": "24.x"
   },
   "scripts": {
-    "predev": "npm run build:docs",
+    "predev": "npm run build:docs && npm run maplibre:worker",
     "dev": "next dev",
+    "dev:setup": "npm run db:push && npm run db:seed",
     "build:docs": "tsx scripts/build-docs.ts",
     "maplibre:worker": "node scripts/copy-maplibre-worker.mjs",
     "prebuild": "npm run build:docs && npm run check:openapi && npm run maplibre:worker",
@@ -48,6 +49,7 @@
     "maplibre-gl": "^6.9.0",
     "mermaid": "^11.17.2",
     "next": "16.3.4",
+    "nodemailer": "^10.0.3",
     "papaparse": "^5.7.0",
     "postgres": "^3.4.9",
     "react": "19.2.8",
@@ -62,6 +64,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^24.13.4",
+    "@types/nodemailer": "^8.0.1",
     "@types/papaparse": "^5.5.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",

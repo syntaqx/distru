@@ -72,7 +72,7 @@ function detailResponses(envelope: string, description: string) {
 }
 
 export const paths: Record<string, unknown> = {
-  "/public/v1/plant-batches": {
+  "/api/v1/plant-batches": {
     get: {
       tags: ["Cultivation"],
       summary: "List plant batches",
@@ -92,7 +92,7 @@ export const paths: Record<string, unknown> = {
       responses: upsertResponses("PlantBatchEnvelope"),
     },
   },
-  "/public/v1/plant-batches/{id}": {
+  "/api/v1/plant-batches/{id}": {
     get: {
       tags: ["Cultivation"],
       summary: "Get a plant batch by id",
@@ -100,7 +100,7 @@ export const paths: Record<string, unknown> = {
       responses: detailResponses("PlantBatchEnvelope", "The plant batch."),
     },
   },
-  "/public/v1/plants": {
+  "/api/v1/plants": {
     get: {
       tags: ["Cultivation"],
       summary: "List plants",
@@ -128,7 +128,7 @@ export const paths: Record<string, unknown> = {
       responses: upsertResponses("PlantEnvelope"),
     },
   },
-  "/public/v1/plants/{id}": {
+  "/api/v1/plants/{id}": {
     get: {
       tags: ["Cultivation"],
       summary: "Get a plant by id",
@@ -136,7 +136,7 @@ export const paths: Record<string, unknown> = {
       responses: detailResponses("PlantEnvelope", "The plant."),
     },
   },
-  "/public/v1/harvests": {
+  "/api/v1/harvests": {
     get: {
       tags: ["Cultivation"],
       summary: "List harvests",
@@ -156,7 +156,7 @@ export const paths: Record<string, unknown> = {
       responses: upsertResponses("HarvestEnvelope"),
     },
   },
-  "/public/v1/harvests/{id}": {
+  "/api/v1/harvests/{id}": {
     get: {
       tags: ["Cultivation"],
       summary: "Get a harvest by id",
@@ -164,7 +164,7 @@ export const paths: Record<string, unknown> = {
       responses: detailResponses("HarvestEnvelope", "The harvest."),
     },
   },
-  "/public/v1/plant-events": {
+  "/api/v1/plant-events": {
     get: {
       tags: ["Cultivation"],
       summary: "List plant lifecycle events",

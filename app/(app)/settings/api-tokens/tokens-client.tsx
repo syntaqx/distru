@@ -113,10 +113,10 @@ export function TokensClient({
         Public REST API (Distru-compatible)
       </h2>
       <p className="mb-2 text-sm text-muted">List products (Bearer auth, page[number] pagination, string-numbers):</p>
-      <CodeBlock code={`curl -H "Authorization: Bearer ${sampleToken}" \\\n  ${appUrl}/public/v1/products`} />
+      <CodeBlock code={`curl -H "Authorization: Bearer ${sampleToken}" \\\n  ${appUrl}/api/v1/products`} />
       <p className="mb-2 mt-4 text-sm text-muted">Sparse upsert a product (omit id to create, include to update):</p>
       <CodeBlock
-        code={`curl -X POST ${appUrl}/public/v1/products \\\n  -H "Authorization: Bearer ${sampleToken}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"name":"Gelato 3.5g","sku":"FL-GEL-35","category":"Flower","vendor":"Sungrown Farms","unit_type":"Gram","unit_price":34}'`}
+        code={`curl -X POST ${appUrl}/api/v1/products \\\n  -H "Authorization: Bearer ${sampleToken}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"name":"Gelato 3.5g","sku":"FL-GEL-35","category":"Flower","vendor":"Sungrown Farms","unit_type":"Gram","unit_price":34}'`}
       />
       <p className="mb-2 mt-4 text-sm text-muted">Bulk upload (chunk, validate, partial upload, error CSV):</p>
       <CodeBlock code={`curl -X POST ${appUrl}/api/upload-products \\\n  -H "Authorization: Bearer ${sampleToken}" \\\n  -F file=@catalog.csv`} />

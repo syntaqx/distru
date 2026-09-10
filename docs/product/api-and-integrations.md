@@ -11,8 +11,10 @@ Distru exposes the same data the UI and Copilot use through a public API, an MCP
 
 ## Public REST API
 ```
-curl -H "Authorization: Bearer dk_live_..." http://localhost:3000/public/v1/products
+curl -H "Authorization: Bearer dk_live_..." http://localhost:3000/api/v1/products
 ```
+
+Every endpoint lives under a **version prefix**, `/api/v1`. A future breaking revision ships as a sibling `/api/v2`, so both serve side by side and clients migrate on their own schedule. For a dedicated API hostname, set `API_HOST=api.yourdomain.com` and point that DNS at the deployment: the subdomain then serves the API at its root (`api.yourdomain.com/v1/products` → `/api/v1/products`), version still in the path. Left unset, the API stays at `/api/v1`.
 
 The API follows Distru's conventions so existing Distru integrations feel at home:
 - **Bearer auth** with your API token; all IDs are UUIDs.

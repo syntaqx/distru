@@ -66,47 +66,47 @@ function detailOp(
 }
 
 export const paths: Record<string, unknown> = {
-  "/public/v1/metrc/items": listOp(
+  "/api/v1/metrc/items": listOp(
     "List Metrc items",
     "Returns the Metrc items synced for the org. Reflects synced Metrc state; empty until a Metrc connection is established.",
   ),
-  "/public/v1/metrc/lab-test-batches": listOp(
+  "/api/v1/metrc/lab-test-batches": listOp(
     "List Metrc lab test batches",
     "Returns the Metrc lab test batches synced for the org. Reflects synced Metrc state; empty until a Metrc connection is established.",
   ),
-  "/public/v1/metrc/locations": listOp(
+  "/api/v1/metrc/locations": listOp(
     "List Metrc locations",
     "Returns the Metrc locations synced for the org. Reflects synced Metrc state; empty until a Metrc connection is established.",
   ),
-  "/public/v1/metrc/packages": listOp(
+  "/api/v1/metrc/packages": listOp(
     "List Metrc packages",
     "Returns the Metrc packages synced for the org. Reflects synced Metrc state; empty until a Metrc connection is established.",
   ),
-  "/public/v1/metrc/packages/{label}": detailOp(
+  "/api/v1/metrc/packages/{label}": detailOp(
     "Get a Metrc package",
     "Returns a single Metrc package by its tag label. Reflects synced Metrc state; 404 until a Metrc connection is established.",
     "label",
     "The Metrc package tag label.",
   ),
-  "/public/v1/metrc/strains": listOp(
+  "/api/v1/metrc/strains": listOp(
     "List Metrc strains",
     "Returns the Metrc strains synced for the org. Reflects synced Metrc state; empty until a Metrc connection is established.",
   ),
-  "/public/v1/metrc/tags": listOp(
+  "/api/v1/metrc/tags": listOp(
     "List Metrc tags",
     "Returns the Metrc tags synced for the org. Reflects synced Metrc state; empty until a Metrc connection is established.",
   ),
-  "/public/v1/metrc/tags/{id}": detailOp(
+  "/api/v1/metrc/tags/{id}": detailOp(
     "Get a Metrc tag",
     "Returns a single Metrc tag by id. Reflects synced Metrc state; 404 until a Metrc connection is established.",
     "id",
     "The Metrc tag id.",
   ),
-  "/public/v1/metrc/transfers": listOp(
+  "/api/v1/metrc/transfers": listOp(
     "List Metrc transfers",
     "Returns the Metrc transfers synced for the org. Reflects synced Metrc state; empty until a Metrc connection is established.",
   ),
-  "/public/v1/metrc/transfers/{manifest_number}": detailOp(
+  "/api/v1/metrc/transfers/{manifest_number}": detailOp(
     "Get a Metrc transfer",
     "Returns a single Metrc transfer by its manifest number. Reflects synced Metrc state; 404 until a Metrc connection is established.",
     "manifest_number",

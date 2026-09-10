@@ -24,7 +24,7 @@ const okObject = {
 } as const;
 
 export const paths: Record<string, unknown> = {
-  "/public/v1/transfers": {
+  "/api/v1/transfers": {
     get: {
       tags: ["Inventory"],
       summary: "List stock transfers",
@@ -48,7 +48,7 @@ export const paths: Record<string, unknown> = {
       responses: { ...okObject, "400": okObject["200"], "401": unauthorized },
     },
   },
-  "/public/v1/transfers/{id}": {
+  "/api/v1/transfers/{id}": {
     get: {
       tags: ["Inventory"],
       summary: "Get a stock transfer",
@@ -57,7 +57,7 @@ export const paths: Record<string, unknown> = {
       responses: { ...okObject, "401": unauthorized, "404": notFound },
     },
   },
-  "/public/v1/transfers/{id}/manifest/pdf": {
+  "/api/v1/transfers/{id}/manifest/pdf": {
     get: {
       tags: ["Inventory"],
       summary: "Transfer manifest PDF",
@@ -74,7 +74,7 @@ export const paths: Record<string, unknown> = {
       },
     },
   },
-  "/public/v1/inventory/lots": {
+  "/api/v1/inventory/lots": {
     get: {
       tags: ["Inventory"],
       summary: "List FIFO cost layers",
@@ -88,7 +88,7 @@ export const paths: Record<string, unknown> = {
       responses: { ...okObject, "401": unauthorized },
     },
   },
-  "/public/v1/inventory/scan": {
+  "/api/v1/inventory/scan": {
     get: {
       tags: ["Inventory"],
       summary: "Scan lookup",
@@ -106,7 +106,7 @@ export const paths: Record<string, unknown> = {
       responses: { ...okObject, "400": okObject["200"], "401": unauthorized },
     },
   },
-  "/public/v1/inventory": {
+  "/api/v1/inventory": {
     get: {
       tags: ["Inventory"],
       summary: "Inventory on-hand snapshot",
@@ -122,7 +122,7 @@ export const paths: Record<string, unknown> = {
       },
     },
   },
-  "/public/v1/users": {
+  "/api/v1/users": {
     get: {
       tags: ["Users"],
       summary: "List users",
@@ -137,7 +137,7 @@ export const paths: Record<string, unknown> = {
       },
     },
   },
-  "/public/v1/users/{id}": {
+  "/api/v1/users/{id}": {
     get: {
       tags: ["Users"],
       summary: "Get a user",
@@ -153,7 +153,7 @@ export const paths: Record<string, unknown> = {
       },
     },
   },
-  "/public/v1/adjustments/{id}": {
+  "/api/v1/adjustments/{id}": {
     get: {
       tags: ["Inventory"],
       summary: "Get an inventory adjustment",
@@ -171,7 +171,7 @@ export const paths: Record<string, unknown> = {
       },
     },
   },
-  "/public/v1/product-pos-mappings": {
+  "/api/v1/product-pos-mappings": {
     get: {
       tags: ["Misc"],
       summary: "List product/POS mappings",
@@ -199,7 +199,7 @@ export const paths: Record<string, unknown> = {
       },
     },
   },
-  "/public/v1/product-pos-mappings/{id}": {
+  "/api/v1/product-pos-mappings/{id}": {
     get: {
       tags: ["Misc"],
       summary: "Get a product/POS mapping",

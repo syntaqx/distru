@@ -21,14 +21,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Generate lib/docs/_generated.ts (gitignored) before any step that
+      # typechecks / lints / tests the code that imports it - otherwise tsc
+      # fails with "Cannot find module './_generated'".
+      - name: Build docs
+        run: npm run build:docs
+
       - name: Lint
         run: npm run lint
 
       - name: Typecheck
         run: npx tsc --noEmit
-
-      - name: Build docs
-        run: npm run build:docs
 
       - name: Check OpenAPI
         run: npm run check:openapi

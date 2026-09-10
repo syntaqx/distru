@@ -330,7 +330,7 @@ export function ComplianceManager({
                         View
                       </Link>
                       <a
-                        href={`/public/v1/test-results/${r.id}/pdf`}
+                        href={`/api/v1/test-results/${r.id}/pdf`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="btn btn-ghost px-2 py-1"

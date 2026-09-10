@@ -1,13 +1,13 @@
 /**
  * OpenAPI 3.1 description of Distru's public REST API, served at
- * /api/openapi.json and /api/openapi.yaml. Grounded in the actual /public/v1
+ * /api/openapi.json and /api/openapi.yaml. Grounded in the actual /api/v1
  * routes and their Distru-faithful conventions (Bearer auth, string-numbers,
  * page[number] pagination with a next_page URL (page[after] also accepted as an
  * opaque cursor), uppercase enums, sparse upsert, { errors: [...] } envelope).
  * Kept in one place so both formats stay in sync.
  *
  * The `npm run check:openapi` drift guard (run on every build) asserts this spec
- * documents EXACTLY the routes on disk under app/public/v1 - so a new endpoint
+ * documents EXACTLY the routes on disk under app/api/v1 - so a new endpoint
  * can't ship undocumented. To intentionally leave one out (a health probe, an
  * internal endpoint), add its OpenAPI path to OPENAPI_IGNORE below; the guard
  * treats it as a deliberate opt-out instead of a failure.
@@ -31,11 +31,11 @@ export function requestOrigin(req: Request): string {
 
 /**
  * Public routes intentionally left OUT of the OpenAPI spec. Every other route
- * under app/public/v1 must be documented or the build fails. Use the OpenAPI
- * path form (e.g. "/public/v1/health").
+ * under app/api/v1 must be documented or the build fails. Use the OpenAPI
+ * path form (e.g. "/api/v1/health").
  */
 export const OPENAPI_IGNORE: readonly string[] = [
-  "/public/v1/health", // liveness probe - operational, not part of the API contract
+  "/api/v1/health", // liveness probe - operational, not part of the API contract
 ];
 
 const ref = {
@@ -70,7 +70,7 @@ export function buildOpenApiSpec(baseUrl: string): Record<string, unknown> {
         "Tokens are org-scoped and stored hashed. Unauthenticated requests get `401`.",
         "",
         "## Base URL & conventions",
-        "- **Base URL:** `" + baseUrl + "/public/v1`",
+        "- **Base URL:** `" + baseUrl + "/api/v1`",
         "- **IDs** are UUIDs.",
         "- **Numbers** (money, quantities) are serialized as **strings** with fixed precision, e.g. `\"25.000000\"`.",
         "- **Datetimes** are ISO-8601 with microseconds and a `Z` suffix; the universal created key is `inserted_datetime`.",
@@ -80,7 +80,7 @@ export function buildOpenApiSpec(baseUrl: string): Record<string, unknown> {
         "## Pagination",
         "List endpoints page with `page[number]` (1-based) and echo a `next_page` URL you can follow for the next page. An opaque cursor `page[after]` is also accepted.",
         "```http",
-        "GET /public/v1/products?page[number]=2",
+        "GET /api/v1/products?page[number]=2",
         "```",
         "",
         "## Filtering",
@@ -124,7 +124,7 @@ export function buildOpenApiSpec(baseUrl: string): Record<string, unknown> {
       { name: "Platform" },
     ],
     paths: {
-      "/public/v1/products": {
+      "/api/v1/products": {
         get: {
           tags: ["Products"],
           summary: "List products",
@@ -170,7 +170,7 @@ export function buildOpenApiSpec(baseUrl: string): Record<string, unknown> {
           },
         },
       },
-      "/public/v1/products/{id}": {
+      "/api/v1/products/{id}": {
         get: {
           tags: ["Products"],
           summary: "Get a product by id",
@@ -185,7 +185,7 @@ export function buildOpenApiSpec(baseUrl: string): Record<string, unknown> {
           },
         },
       },
-      "/public/v1/companies": {
+      "/api/v1/companies": {
         get: {
           tags: ["Companies"],
           summary: "List companies (customers, vendors, brands)",
@@ -224,7 +224,7 @@ export function buildOpenApiSpec(baseUrl: string): Record<string, unknown> {
           },
         },
       },
-      "/public/v1/companies/{id}": {
+      "/api/v1/companies/{id}": {
         get: {
           tags: ["Companies"],
           summary: "Get a company by id",
@@ -239,7 +239,7 @@ export function buildOpenApiSpec(baseUrl: string): Record<string, unknown> {
           },
         },
       },
-      "/public/v1/product-categories": {
+      "/api/v1/product-categories": {
         get: {
           tags: ["Categories"],
           summary: "List categories",
@@ -272,7 +272,7 @@ export function buildOpenApiSpec(baseUrl: string): Record<string, unknown> {
           },
         },
       },
-      "/public/v1/adjustments": {
+      "/api/v1/adjustments": {
         get: {
           tags: ["Inventory"],
           summary: "List stock adjustments",
@@ -308,7 +308,7 @@ export function buildOpenApiSpec(baseUrl: string): Record<string, unknown> {
           },
         },
       },
-      "/public/v1/orders": {
+      "/api/v1/orders": {
         get: {
           tags: ["Orders"],
           summary: "List sales orders",
@@ -349,7 +349,7 @@ export function buildOpenApiSpec(baseUrl: string): Record<string, unknown> {
           },
         },
       },
-      "/public/v1/orders/{id}": {
+      "/api/v1/orders/{id}": {
         get: {
           tags: ["Orders"],
           summary: "Get an order by id",
@@ -364,7 +364,7 @@ export function buildOpenApiSpec(baseUrl: string): Record<string, unknown> {
           },
         },
       },
-      "/public/v1/invoices": {
+      "/api/v1/invoices": {
         get: {
           tags: ["Invoices"],
           summary: "List invoices",
@@ -404,7 +404,7 @@ export function buildOpenApiSpec(baseUrl: string): Record<string, unknown> {
           },
         },
       },
-      "/public/v1/invoices/{id}": {
+      "/api/v1/invoices/{id}": {
         get: {
           tags: ["Invoices"],
           summary: "Get an invoice by id",
@@ -419,7 +419,7 @@ export function buildOpenApiSpec(baseUrl: string): Record<string, unknown> {
           },
         },
       },
-      "/public/v1/purchases": {
+      "/api/v1/purchases": {
         get: {
           tags: ["Purchasing"],
           summary: "List purchase orders",
@@ -459,7 +459,7 @@ export function buildOpenApiSpec(baseUrl: string): Record<string, unknown> {
           },
         },
       },
-      "/public/v1/purchases/{id}": {
+      "/api/v1/purchases/{id}": {
         get: {
           tags: ["Purchasing"],
           summary: "Get a purchase order by id",
@@ -474,7 +474,7 @@ export function buildOpenApiSpec(baseUrl: string): Record<string, unknown> {
           },
         },
       },
-      "/public/v1/returns": {
+      "/api/v1/returns": {
         get: {
           tags: ["Returns"],
           summary: "List returns",
@@ -515,7 +515,7 @@ export function buildOpenApiSpec(baseUrl: string): Record<string, unknown> {
           },
         },
       },
-      "/public/v1/returns/{id}": {
+      "/api/v1/returns/{id}": {
         get: {
           tags: ["Returns"],
           summary: "Get a return by id",
@@ -530,7 +530,7 @@ export function buildOpenApiSpec(baseUrl: string): Record<string, unknown> {
           },
         },
       },
-      "/public/v1/payments": {
+      "/api/v1/payments": {
         get: {
           tags: ["Payments"],
           summary: "List payments",
@@ -544,7 +544,7 @@ export function buildOpenApiSpec(baseUrl: string): Record<string, unknown> {
           },
         },
       },
-      "/public/v1/payments/{id}": {
+      "/api/v1/payments/{id}": {
         get: {
           tags: ["Payments"],
           summary: "Get a payment by id",
@@ -556,7 +556,7 @@ export function buildOpenApiSpec(baseUrl: string): Record<string, unknown> {
           },
         },
       },
-      "/public/v1/contacts": {
+      "/api/v1/contacts": {
         get: {
           tags: ["Contacts"],
           summary: "List contacts",
@@ -583,7 +583,7 @@ export function buildOpenApiSpec(baseUrl: string): Record<string, unknown> {
           },
         },
       },
-      "/public/v1/contacts/{id}": {
+      "/api/v1/contacts/{id}": {
         get: {
           tags: ["Contacts"],
           summary: "Get a contact by id",
@@ -595,7 +595,7 @@ export function buildOpenApiSpec(baseUrl: string): Record<string, unknown> {
           },
         },
       },
-      "/public/v1/company-groups": {
+      "/api/v1/company-groups": {
         get: {
           tags: ["Companies"],
           summary: "List company groups",
@@ -620,7 +620,7 @@ export function buildOpenApiSpec(baseUrl: string): Record<string, unknown> {
           },
         },
       },
-      "/public/v1/company-groups/{id}": {
+      "/api/v1/company-groups/{id}": {
         get: {
           tags: ["Companies"],
           summary: "Get a company group by id",
@@ -632,7 +632,7 @@ export function buildOpenApiSpec(baseUrl: string): Record<string, unknown> {
           },
         },
       },
-      "/public/v1/locations": {
+      "/api/v1/locations": {
         get: {
           tags: ["Reference"],
           summary: "List locations (warehouses / rooms)",
@@ -646,7 +646,7 @@ export function buildOpenApiSpec(baseUrl: string): Record<string, unknown> {
           },
         },
       },
-      "/public/v1/locations/{id}": {
+      "/api/v1/locations/{id}": {
         get: {
           tags: ["Reference"],
           summary: "Get a location by id",
@@ -658,7 +658,7 @@ export function buildOpenApiSpec(baseUrl: string): Record<string, unknown> {
           },
         },
       },
-      "/public/v1/unit-types": {
+      "/api/v1/unit-types": {
         get: {
           tags: ["Reference"],
           summary: "List unit types (Gram, Ounce, Unit, ...)",
@@ -672,7 +672,7 @@ export function buildOpenApiSpec(baseUrl: string): Record<string, unknown> {
           },
         },
       },
-      "/public/v1/unit-types/{id}": {
+      "/api/v1/unit-types/{id}": {
         get: {
           tags: ["Reference"],
           summary: "Get a unit type by id",
@@ -1592,10 +1592,10 @@ function buildScaffoldResources(): { paths: Record<string, Sch>; schemas: Record
         },
       };
     }
-    paths[`/public/v1/${r.path}`] = collection;
+    paths[`/api/v1/${r.path}`] = collection;
 
     if (withId) {
-      paths[`/public/v1/${r.path}/{id}`] = {
+      paths[`/api/v1/${r.path}/{id}`] = {
         get: {
           tags: [r.tag],
           summary: `Get a ${r.title} by id`,

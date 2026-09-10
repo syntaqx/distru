@@ -3,16 +3,19 @@ import { db } from "@/db";
 import {
   companies,
   deliveries,
+  deliveryRoutes,
   drivers,
+  locations,
   orders,
-  telemetryPings,
-  vehicleTelemetry,
   vehicles,
 } from "@/db/schema";
 import type { ServiceCtx } from "../shared";
 import { datetime } from "../shared";
 import type { Address } from "../sales";
-import { advanceDeliveryStatus } from "./deliveries";
+import type { DeliveryStatus } from "./deliveries";
+import { pointAtFraction, polylineMeters } from "./route-geometry";
+import { getRunGeometryPersisted } from "./route-cache";
+import type { RouteResult } from "@/lib/integrations";
 
 /**
  * Vehicle telemetry - the "live" layer over the fleet. A single last-known ping
@@ -37,52 +40,12 @@ export const AUSTIN_BOUNDS = {
 
 export const AUSTIN_DEPOT = { lat: 30.2672, lng: -97.7431 } as const;
 
-/** Clamp a coordinate into the Austin viewport so a marker can never drift off-map. */
-function clamp(lat: number, lng: number): { lat: number; lng: number } {
-  return {
-    lat: Math.min(AUSTIN_BOUNDS.north, Math.max(AUSTIN_BOUNDS.south, lat)),
-    lng: Math.min(AUSTIN_BOUNDS.east, Math.max(AUSTIN_BOUNDS.west, lng)),
-  };
-}
-
 const toNum = (v: string | number | null | undefined): number | null =>
   v === null || v === undefined || v === "" ? null : Number(v);
-
-// ---- Geometry (equirectangular, fine at city scale) --------------------------
-
-/** Rough distance in miles between two lat/lng points (city-scale approximation). */
-function distanceMiles(a: LatLng, b: LatLng): number {
-  const midLat = ((a.lat + b.lat) / 2) * (Math.PI / 180);
-  const dx = (b.lng - a.lng) * Math.cos(midLat) * 69.172;
-  const dy = (b.lat - a.lat) * 69.172;
-  return Math.sqrt(dx * dx + dy * dy);
-}
-
-/** Compass bearing (0=N, 90=E) from `a` to `b`, as an integer 0-359. */
-function bearingDeg(a: LatLng, b: LatLng): number {
-  const midLat = ((a.lat + b.lat) / 2) * (Math.PI / 180);
-  const dx = (b.lng - a.lng) * Math.cos(midLat);
-  const dy = b.lat - a.lat;
-  const deg = (Math.atan2(dx, dy) * 180) / Math.PI;
-  return Math.round((deg + 360) % 360);
-}
 
 type LatLng = { lat: number; lng: number };
 
 // ---- Types -------------------------------------------------------------------
-
-export type TelemetryRow = typeof vehicleTelemetry.$inferSelect;
-
-export type TelemetryInput = {
-  vehicleId: string;
-  lat: number;
-  lng: number;
-  speedMph?: number;
-  headingDeg?: number;
-  status?: TelemetryStatus;
-  currentDeliveryId?: string | null;
-  recordPing?: boolean;
-};
 
 export type FleetVehicleTelemetry = {
   vehicle: {
@@ -118,7 +81,7 @@ export type FleetVehicleTelemetry = {
 };
 
 export type FleetTelemetry = {
-  depot: LatLng;
+  depot: LatLng & { name: string | null; address: string | null };
   bounds: typeof AUSTIN_BOUNDS;
   vehicles: FleetVehicleTelemetry[];
   stops: {
@@ -135,11 +98,20 @@ export type FleetTelemetry = {
    * Today's stops grouped into each driver's run, ordered by stop sequence - so
    * the map can draw one route line per driver (depot -> stops) and the operator
    * can see every driver's routes and stops for the area at a glance.
+   *
+   * `geometry` is the real street path through the run (depot -> stops -> depot)
+   * from the routing provider, or null when routing is unavailable (the map then
+   * draws straight lines). `legs` splits that path per stop so the map can
+   * animate each vehicle down the exact street segment toward its current stop:
+   * `toDeliveryId` is the delivery a leg arrives at (null on the return-to-depot
+   * leg, used to animate a RETURNING vehicle).
    */
   routes: {
     driverId: string;
     driverName: string;
     vehicleId: string | null;
+    geometry: [number, number][] | null;
+    legs: { toDeliveryId: string | null; geometry: [number, number][] }[];
     stops: {
       id: string;
       lat: number;
@@ -156,9 +128,6 @@ export type FleetTelemetry = {
 
 // ---- Read --------------------------------------------------------------------
 
-/** Assumed average urban speed (mph) used to estimate an ETA from distance. */
-const AVG_MPH = 22;
-
 /**
  * The full dispatch snapshot: every vehicle with its latest telemetry, the
  * delivery it's currently running (with destination coords + a distance-based
@@ -167,19 +136,16 @@ const AVG_MPH = 22;
  * the public telemetry endpoint render.
  */
 export async function getFleetTelemetry(ctx: ServiceCtx): Promise<FleetTelemetry> {
+  const now = Date.now();
+  const depot = await getDepot(ctx);
+
   const vehicleRows = await db
     .select()
     .from(vehicles)
     .where(eq(vehicles.organizationId, ctx.orgId))
     .orderBy(asc(vehicles.name));
 
-  const telemetryRows = await db
-    .select()
-    .from(vehicleTelemetry)
-    .where(eq(vehicleTelemetry.organizationId, ctx.orgId));
-  const telByVehicle = new Map(telemetryRows.map((t) => [t.vehicleId, t]));
-
-  // Today's deliveries (for per-vehicle done/remaining tallies + the map's stops).
+  // Today's deliveries, joined to their run's schedule (departure/complete times).
   const { start, end } = todayWindow();
   const todays = await db
     .select({
@@ -188,11 +154,14 @@ export async function getFleetTelemetry(ctx: ServiceCtx): Promise<FleetTelemetry
       customerName: companies.name,
       driverId: drivers.id,
       driverName: drivers.name,
+      departureAt: deliveryRoutes.departureAt,
+      completeAt: deliveryRoutes.completeAt,
     })
     .from(deliveries)
     .leftJoin(orders, eq(deliveries.orderId, orders.id))
     .leftJoin(companies, eq(orders.customerId, companies.id))
     .leftJoin(drivers, eq(deliveries.driverId, drivers.id))
+    .leftJoin(deliveryRoutes, eq(deliveries.routeId, deliveryRoutes.id))
     .where(
       and(
         eq(deliveries.organizationId, ctx.orgId),
@@ -200,70 +169,110 @@ export async function getFleetTelemetry(ctx: ServiceCtx): Promise<FleetTelemetry
         lt(deliveries.scheduledAt, end),
       ),
     )
-    .orderBy(asc(deliveries.sequence));
+    .orderBy(asc(deliveries.sequence), asc(deliveries.createdAt));
 
-  const deliveryById = new Map(todays.map((d) => [d.delivery.id, d]));
+  // Group today's deliveries into each driver's ordered run.
+  type RunRow = (typeof todays)[number];
+  const runMap = new Map<string, RunRow[]>();
+  for (const d of todays) {
+    if (!d.driverId || toNum(d.delivery.lat) == null || toNum(d.delivery.lng) == null) continue;
+    (runMap.get(d.driverId) ?? runMap.set(d.driverId, []).get(d.driverId)!).push(d);
+  }
+
+  // For every run: fetch its cached street geometry, then derive live state from
+  // the wall clock against the run's schedule (position on the road, status, ETA,
+  // and which stops have been dropped) - so the day simply progresses in real time.
+  type Computed = {
+    driverId: string;
+    driverName: string;
+    vehicleId: string | null;
+    orderedStops: RunRow[];
+    geometry: [number, number][] | null;
+    legs: { toDeliveryId: string | null; geometry: [number, number][] }[];
+    sim: RunSim;
+  };
+  const computed: Computed[] = await Promise.all(
+    Array.from(runMap.entries()).map(async ([driverId, rows]) => {
+      const ordered = [...rows].sort(
+        (a, b) => (a.delivery.sequence ?? 999) - (b.delivery.sequence ?? 999),
+      );
+      const stops = ordered.map((d) => ({ id: d.delivery.id, lat: Number(d.delivery.lat), lng: Number(d.delivery.lng) }));
+      const { route, legDeliveryIds } = await getRunGeometryPersisted(ctx, depot, stops);
+      const legs =
+        route?.legs.map((leg, i) => ({ toDeliveryId: legDeliveryIds[i] ?? null, geometry: leg.geometry as [number, number][] })) ?? [];
+      const sim = simulateRun(depot, stops, route, ordered[0].departureAt, ordered[0].completeAt, now);
+      return {
+        driverId,
+        driverName: ordered[0].driverName ?? "",
+        vehicleId: ordered[0].delivery.vehicleId ?? null,
+        orderedStops: ordered,
+        geometry: (route?.geometry ?? null) as [number, number][] | null,
+        legs,
+        sim,
+      };
+    }),
+  );
+
+  // Computed status per delivery (time-derived), and reconcile the DB toward it so
+  // the deliveries board + reports reflect the day - recording real drop times.
+  const statusById = new Map<string, string>();
+  const computedByVehicle = new Map<string, Computed>();
+  const reconcile: { id: string; status: DeliveryStatus; deliveredAt: Date | null }[] = [];
+  for (const c of computed) {
+    if (c.vehicleId) computedByVehicle.set(c.vehicleId, c);
+    for (const d of c.orderedStops) {
+      const st = c.sim.stopStatus.get(d.delivery.id) ?? "ASSIGNED";
+      statusById.set(d.delivery.id, st);
+      const dropped = c.sim.deliveredAt.get(d.delivery.id) ?? null;
+      if (d.delivery.status !== st || (st === "DELIVERED" && !d.delivery.deliveredAt)) {
+        reconcile.push({ id: d.delivery.id, status: st as DeliveryStatus, deliveredAt: dropped });
+      }
+    }
+  }
+  for (const r of reconcile) {
+    await db
+      .update(deliveries)
+      .set({ status: r.status, ...(r.deliveredAt ? { deliveredAt: r.deliveredAt } : {}), updatedAt: new Date() })
+      .where(and(eq(deliveries.organizationId, ctx.orgId), eq(deliveries.id, r.id)));
+  }
+
+  // ---- Build the snapshot from the computed state --------------------------
+  const custOf = (d: RunRow) => d.customerName ?? addressName(d.delivery.address);
 
   const vehiclesOut: FleetVehicleTelemetry[] = vehicleRows.map((v) => {
-    const t = telByVehicle.get(v.id);
-    const forVehicle = todays.filter((d) => d.delivery.vehicleId === v.id);
-    const deliveredToday = forVehicle.filter((d) => d.delivery.status === "DELIVERED").length;
-    const remainingToday = forVehicle.filter(
-      (d) => d.delivery.status === "OUT_FOR_DELIVERY" || d.delivery.status === "ASSIGNED",
-    ).length;
-
-    // Driver: from the current delivery, else from any of today's stops for this vehicle.
-    const cur = t?.currentDeliveryId ? deliveryById.get(t.currentDeliveryId) : undefined;
-    const driverSource = cur ?? forVehicle.find((d) => d.driverId);
-    const driver = driverSource?.driverId
-      ? { id: driverSource.driverId, name: driverSource.driverName ?? "" }
-      : null;
-
-    let currentDelivery: FleetVehicleTelemetry["currentDelivery"] = null;
-    if (cur) {
-      const dLat = toNum(cur.delivery.lat);
-      const dLng = toNum(cur.delivery.lng);
-      let etaMinutes: number | null = null;
-      if (t && dLat != null && dLng != null) {
-        const miles = distanceMiles({ lat: Number(t.lat), lng: Number(t.lng) }, { lat: dLat, lng: dLng });
-        etaMinutes = Math.max(1, Math.round((miles / AVG_MPH) * 60));
-      }
-      currentDelivery = {
-        id: cur.delivery.id,
-        orderNumber: cur.orderNumber ?? null,
-        customer: cur.customerName ?? null,
-        address: formatAddress(cur.delivery.address),
-        lat: dLat,
-        lng: dLng,
-        sequence: cur.delivery.sequence ?? null,
-        status: cur.delivery.status,
-        etaMinutes,
+    const c = computedByVehicle.get(v.id);
+    if (!c) {
+      // A vehicle with no run today - parked at the depot.
+      return {
+        vehicle: { id: v.id, name: v.name, make: v.make ?? null, model: v.model ?? null, licensePlate: v.licensePlate ?? null, baseLat: toNum(v.lat), baseLng: toNum(v.lng) },
+        telemetry: { lat: depot.lat, lng: depot.lng, speedMph: 0, headingDeg: 0, status: "IDLE", updatedAt: datetime(new Date(now)) },
+        driver: null,
+        currentDelivery: null,
+        stats: { deliveredToday: 0, remainingToday: 0, totalToday: 0 },
       };
     }
-
+    const delivered = c.orderedStops.filter((d) => statusById.get(d.delivery.id) === "DELIVERED").length;
+    const total = c.orderedStops.length;
+    const curRow = c.sim.currentDeliveryId ? c.orderedStops.find((d) => d.delivery.id === c.sim.currentDeliveryId) : undefined;
+    const p = c.sim.position;
     return {
-      vehicle: {
-        id: v.id,
-        name: v.name,
-        make: v.make ?? null,
-        model: v.model ?? null,
-        licensePlate: v.licensePlate ?? null,
-        baseLat: toNum(v.lat),
-        baseLng: toNum(v.lng),
-      },
-      telemetry: t
+      vehicle: { id: v.id, name: v.name, make: v.make ?? null, model: v.model ?? null, licensePlate: v.licensePlate ?? null, baseLat: toNum(v.lat), baseLng: toNum(v.lng) },
+      telemetry: { lat: p.lat, lng: p.lng, speedMph: p.speedMph, headingDeg: p.heading, status: c.sim.status, updatedAt: datetime(new Date(now)) },
+      driver: { id: c.driverId, name: c.driverName },
+      currentDelivery: curRow
         ? {
-            lat: Number(t.lat),
-            lng: Number(t.lng),
-            speedMph: Number(t.speedMph),
-            headingDeg: t.headingDeg,
-            status: t.status as TelemetryStatus,
-            updatedAt: datetime(t.updatedAt),
+            id: curRow.delivery.id,
+            orderNumber: curRow.orderNumber ?? null,
+            customer: custOf(curRow),
+            address: formatAddress(curRow.delivery.address),
+            lat: toNum(curRow.delivery.lat),
+            lng: toNum(curRow.delivery.lng),
+            sequence: curRow.delivery.sequence ?? null,
+            status: statusById.get(curRow.delivery.id) ?? "ASSIGNED",
+            etaMinutes: c.sim.etaMinutes,
           }
         : null,
-      driver,
-      currentDelivery,
-      stats: { deliveredToday, remainingToday, totalToday: forVehicle.length },
+      stats: { deliveredToday: delivered, remainingToday: total - delivered, totalToday: total },
     };
   });
 
@@ -275,277 +284,152 @@ export async function getFleetTelemetry(ctx: ServiceCtx): Promise<FleetTelemetry
       return {
         id: d.delivery.id,
         orderNumber: d.orderNumber ?? null,
-        customer: d.customerName ?? null,
+        customer: custOf(d),
         address: formatAddress(d.delivery.address),
         lat,
         lng,
-        status: d.delivery.status,
+        status: statusById.get(d.delivery.id) ?? d.delivery.status,
         sequence: d.delivery.sequence ?? null,
       };
     })
     .filter((s): s is NonNullable<typeof s> => s != null);
 
-  // Group today's stops into each driver's ordered run (for the route lines).
-  const routeMap = new Map<string, FleetTelemetry["routes"][number]>();
-  for (const d of todays) {
-    const lat = toNum(d.delivery.lat);
-    const lng = toNum(d.delivery.lng);
-    if (lat == null || lng == null || !d.driverId) continue;
-    let r = routeMap.get(d.driverId);
-    if (!r) {
-      r = {
-        driverId: d.driverId,
-        driverName: d.driverName ?? "",
-        vehicleId: d.delivery.vehicleId ?? null,
-        stops: [],
-      };
-      routeMap.set(d.driverId, r);
-    }
-    r.stops.push({
+  const routes = computed.map((c) => ({
+    driverId: c.driverId,
+    driverName: c.driverName,
+    vehicleId: c.vehicleId,
+    geometry: c.geometry,
+    legs: c.legs,
+    stops: c.orderedStops.map((d) => ({
       id: d.delivery.id,
-      lat,
-      lng,
+      lat: Number(d.delivery.lat),
+      lng: Number(d.delivery.lng),
       sequence: d.delivery.sequence ?? null,
-      status: d.delivery.status,
-      customer: d.customerName ?? null,
+      status: statusById.get(d.delivery.id) ?? d.delivery.status,
+      customer: custOf(d),
       orderNumber: d.orderNumber ?? null,
       address: formatAddress(d.delivery.address),
-    });
-  }
-  const routes = Array.from(routeMap.values()).map((r) => ({
-    ...r,
-    stops: r.stops.sort((a, b) => (a.sequence ?? 999) - (b.sequence ?? 999)),
+    })),
   }));
 
   const fleet = {
     enRoute: vehiclesOut.filter((v) => v.telemetry?.status === "EN_ROUTE").length,
     idle: vehiclesOut.filter((v) => !v.telemetry || v.telemetry.status === "IDLE").length,
     returning: vehiclesOut.filter((v) => v.telemetry?.status === "RETURNING").length,
-    stopsRemaining: stops.filter(
-      (s) => s.status === "OUT_FOR_DELIVERY" || s.status === "ASSIGNED",
-    ).length,
+    stopsRemaining: stops.filter((s) => s.status === "OUT_FOR_DELIVERY" || s.status === "ASSIGNED").length,
   };
 
-  return { depot: AUSTIN_DEPOT, bounds: AUSTIN_BOUNDS, vehicles: vehiclesOut, stops, routes, fleet };
+  return { depot, bounds: AUSTIN_BOUNDS, vehicles: vehiclesOut, stops, routes, fleet };
 }
 
-/** Latest ping per vehicle, keyed by vehicleId (raw rows; used internally). */
-export async function getTelemetryByVehicle(ctx: ServiceCtx): Promise<Map<string, TelemetryRow>> {
-  const rows = await db
-    .select()
-    .from(vehicleTelemetry)
-    .where(eq(vehicleTelemetry.organizationId, ctx.orgId));
-  return new Map(rows.map((r) => [r.vehicleId, r]));
-}
+// ---- Real-time run simulation (position/status derived from the clock) -------
 
-// ---- Write -------------------------------------------------------------------
-
-/**
- * Upsert the last-known ping for a vehicle (one row per vehicle, replaced in
- * place). Optionally also append a row to the `telemetry_pings` history trail.
- */
-export async function upsertTelemetry(ctx: ServiceCtx, input: TelemetryInput): Promise<TelemetryRow> {
-  const { lat, lng } = clamp(input.lat, input.lng);
-  const latS = lat.toFixed(6);
-  const lngS = lng.toFixed(6);
-  const speed = (input.speedMph ?? 0).toFixed(2);
-  const heading = Math.round(input.headingDeg ?? 0) % 360;
-  const status = input.status ?? "IDLE";
-  const now = new Date();
-
-  const [row] = await db
-    .insert(vehicleTelemetry)
-    .values({
-      organizationId: ctx.orgId,
-      vehicleId: input.vehicleId,
-      lat: latS,
-      lng: lngS,
-      speedMph: speed,
-      headingDeg: heading,
-      status,
-      currentDeliveryId: input.currentDeliveryId ?? null,
-      updatedAt: now,
-    })
-    .onConflictDoUpdate({
-      target: [vehicleTelemetry.organizationId, vehicleTelemetry.vehicleId],
-      set: {
-        lat: latS,
-        lng: lngS,
-        speedMph: speed,
-        headingDeg: heading,
-        status,
-        currentDeliveryId: input.currentDeliveryId ?? null,
-        updatedAt: now,
-      },
-    })
-    .returning();
-
-  if (input.recordPing) {
-    await db.insert(telemetryPings).values({
-      organizationId: ctx.orgId,
-      vehicleId: input.vehicleId,
-      lat: latS,
-      lng: lngS,
-      speedMph: speed,
-      headingDeg: heading,
-      recordedAt: now,
-    });
-  }
-  return row;
-}
-
-// Fraction of the remaining distance to close each tick, and the arrival radius.
-const STEP_FRACTION = 0.4;
-const ARRIVAL_MILES = 0.25;
-
-export type SimulateResult = {
-  moved: number;
-  arrived: number;
-  vehicles: {
-    vehicleId: string;
-    status: TelemetryStatus;
-    lat: number;
-    lng: number;
-    arrivedDeliveryId?: string;
-  }[];
+type RunSim = {
+  position: { lat: number; lng: number; heading: number; speedMph: number };
+  status: TelemetryStatus;
+  currentDeliveryId: string | null;
+  etaMinutes: number | null;
+  stopStatus: Map<string, string>;
+  deliveredAt: Map<string, Date>;
 };
 
 /**
- * Advance the persisted snapshot one deterministic step: each EN_ROUTE vehicle
- * moves a fixed fraction of the remaining distance toward its current stop's
- * coords (heading + speed recomputed from the leg). On arrival it marks that
- * delivery DELIVERED, then either targets its next pending stop (staying
- * EN_ROUTE) or, if none remain, turns RETURNING toward the depot; once back at
- * the depot it goes IDLE. Deterministic - no randomness - so repeated calls walk
- * the fleet through the day. Records a ping per moved vehicle.
+ * Derive a run's live state at time `now` from its schedule window
+ * [departureAt, completeAt]: the day is divided into equal slots (one per stop
+ * plus a return), each stop is driven then dwelt-at, and the vehicle's position
+ * is interpolated along the real street leg for the phase it's in. Deterministic
+ * in `now`, so the fleet simply plays out the operating day in real time.
  */
-export async function simulateTelemetryTick(ctx: ServiceCtx): Promise<SimulateResult> {
-  const telemetry = await db
-    .select()
-    .from(vehicleTelemetry)
-    .where(eq(vehicleTelemetry.organizationId, ctx.orgId));
+function simulateRun(
+  depot: { lat: number; lng: number },
+  stops: { id: string; lat: number; lng: number }[],
+  route: RouteResult | null,
+  departureAt: Date | null,
+  completeAt: Date | null,
+  now: number,
+): RunSim {
+  const n = stops.length;
+  const stopStatus = new Map<string, string>();
+  const deliveredAt = new Map<string, Date>();
+  const atDepot = { lat: depot.lat, lng: depot.lng, heading: 0, speedMph: 0 };
+  const legGeom = (i: number): [number, number][] | null => route?.legs?.[i]?.geometry ?? null;
 
-  const { start, end } = todayWindow();
-  const todays = await db
-    .select()
-    .from(deliveries)
-    .where(
-      and(
-        eq(deliveries.organizationId, ctx.orgId),
-        gte(deliveries.scheduledAt, start),
-        lt(deliveries.scheduledAt, end),
-      ),
-    )
-    .orderBy(asc(deliveries.sequence), asc(deliveries.createdAt));
-
-  const result: SimulateResult = { moved: 0, arrived: 0, vehicles: [] };
-
-  for (const t of telemetry) {
-    const status = t.status as TelemetryStatus;
-    if (status === "IDLE" || status === "STOPPED") continue;
-
-    const here: LatLng = { lat: Number(t.lat), lng: Number(t.lng) };
-
-    // Resolve the target: current stop (EN_ROUTE) or the depot (RETURNING).
-    let target: LatLng | null = null;
-    const targetDelivery = t.currentDeliveryId
-      ? todays.find((d) => d.id === t.currentDeliveryId)
-      : undefined;
-    if (status === "EN_ROUTE" && targetDelivery && targetDelivery.lat && targetDelivery.lng) {
-      target = { lat: Number(targetDelivery.lat), lng: Number(targetDelivery.lng) };
-    } else if (status === "RETURNING") {
-      target = AUSTIN_DEPOT;
-    }
-    if (!target) continue;
-
-    const remaining = distanceMiles(here, target);
-
-    // Arrived.
-    if (remaining <= ARRIVAL_MILES) {
-      if (status === "EN_ROUTE" && targetDelivery) {
-        await advanceDeliveryStatus(ctx, targetDelivery.id, "DELIVERED");
-        result.arrived++;
-      }
-      // Pick the next pending stop for this vehicle (skip the one just delivered).
-      const next = todays.find(
-        (d) =>
-          d.vehicleId === t.vehicleId &&
-          d.id !== targetDelivery?.id &&
-          d.lat != null &&
-          d.lng != null &&
-          (d.status === "ASSIGNED" || d.status === "OUT_FOR_DELIVERY"),
-      );
-      if (next) {
-        if (next.status === "ASSIGNED") await advanceDeliveryStatus(ctx, next.id, "OUT_FOR_DELIVERY");
-        const nextTarget = { lat: Number(next.lat), lng: Number(next.lng) };
-        const row = await upsertTelemetry(ctx, {
-          vehicleId: t.vehicleId,
-          lat: target.lat,
-          lng: target.lng,
-          speedMph: 18,
-          headingDeg: bearingDeg(target, nextTarget),
-          status: "EN_ROUTE",
-          currentDeliveryId: next.id,
-          recordPing: true,
-        });
-        result.vehicles.push({
-          vehicleId: t.vehicleId,
-          status: "EN_ROUTE",
-          lat: Number(row.lat),
-          lng: Number(row.lng),
-          arrivedDeliveryId: targetDelivery?.id,
-        });
-      } else if (status === "EN_ROUTE") {
-        // No more stops - head home.
-        const row = await upsertTelemetry(ctx, {
-          vehicleId: t.vehicleId,
-          lat: target.lat,
-          lng: target.lng,
-          speedMph: 20,
-          headingDeg: bearingDeg(target, AUSTIN_DEPOT),
-          status: "RETURNING",
-          currentDeliveryId: null,
-          recordPing: true,
-        });
-        result.vehicles.push({ vehicleId: t.vehicleId, status: "RETURNING", lat: Number(row.lat), lng: Number(row.lng), arrivedDeliveryId: targetDelivery?.id });
-      } else {
-        // Back at the depot.
-        const row = await upsertTelemetry(ctx, {
-          vehicleId: t.vehicleId,
-          lat: AUSTIN_DEPOT.lat,
-          lng: AUSTIN_DEPOT.lng,
-          speedMph: 0,
-          headingDeg: t.headingDeg,
-          status: "IDLE",
-          currentDeliveryId: null,
-          recordPing: true,
-        });
-        result.vehicles.push({ vehicleId: t.vehicleId, status: "IDLE", lat: Number(row.lat), lng: Number(row.lng) });
-      }
-      result.moved++;
-      continue;
-    }
-
-    // Step toward the target.
-    const next: LatLng = {
-      lat: here.lat + (target.lat - here.lat) * STEP_FRACTION,
-      lng: here.lng + (target.lng - here.lng) * STEP_FRACTION,
-    };
-    const row = await upsertTelemetry(ctx, {
-      vehicleId: t.vehicleId,
-      lat: next.lat,
-      lng: next.lng,
-      speedMph: status === "RETURNING" ? 24 : 18,
-      headingDeg: bearingDeg(here, target),
-      status,
-      currentDeliveryId: t.currentDeliveryId,
-      recordPing: true,
-    });
-    result.moved++;
-    result.vehicles.push({ vehicleId: t.vehicleId, status, lat: Number(row.lat), lng: Number(row.lng) });
+  if (!departureAt || !completeAt || n === 0) {
+    for (const s of stops) stopStatus.set(s.id, "ASSIGNED");
+    return { position: atDepot, status: "IDLE", currentDeliveryId: stops[0]?.id ?? null, etaMinutes: null, stopStatus, deliveredAt };
   }
 
-  return result;
+  const D = departureAt.getTime();
+  const C = completeAt.getTime();
+  const slot = Math.max(C - D, 60_000) / (n + 1); // n stops + a return leg
+  const dwell = Math.min(slot * 0.35, 12 * 60_000);
+  const drop: number[] = [];
+  const arrive: number[] = [];
+  const driveStart: number[] = [];
+  for (let i = 0; i < n; i++) {
+    drop[i] = D + (i + 1) * slot;
+    arrive[i] = drop[i] - dwell;
+    driveStart[i] = i === 0 ? D : drop[i - 1];
+  }
+  const returnEnd = C;
+
+  for (let i = 0; i < n; i++) {
+    if (drop[i] <= now) {
+      stopStatus.set(stops[i].id, "DELIVERED");
+      deliveredAt.set(stops[i].id, new Date(drop[i]));
+    } else {
+      stopStatus.set(stops[i].id, "ASSIGNED");
+    }
+  }
+
+  const speedFor = (g: [number, number][] | null, ms: number) => {
+    if (!g || g.length < 2 || ms <= 0) return 20;
+    const mph = (polylineMeters(g) / (ms / 1000)) * 2.23694;
+    return Math.round(Math.min(55, Math.max(6, mph)));
+  };
+
+  // Before departure: staged at the depot; after return: parked again.
+  if (now < D) return { position: atDepot, status: "IDLE", currentDeliveryId: stops[0].id, etaMinutes: null, stopStatus, deliveredAt };
+  if (now >= returnEnd) return { position: atDepot, status: "IDLE", currentDeliveryId: null, etaMinutes: null, stopStatus, deliveredAt };
+
+  for (let i = 0; i < n; i++) {
+    if (now >= driveStart[i] && now < arrive[i]) {
+      const g = legGeom(i);
+      const frac = (now - driveStart[i]) / Math.max(arrive[i] - driveStart[i], 1);
+      const p = g && g.length >= 2 ? pointAtFraction(g, frac) : { lat: stops[i].lat, lng: stops[i].lng, heading: 0 };
+      stopStatus.set(stops[i].id, "OUT_FOR_DELIVERY");
+      return { position: { ...p, speedMph: speedFor(g, arrive[i] - driveStart[i]) }, status: "EN_ROUTE", currentDeliveryId: stops[i].id, etaMinutes: Math.max(1, Math.round((arrive[i] - now) / 60_000)), stopStatus, deliveredAt };
+    }
+    if (now >= arrive[i] && now < drop[i]) {
+      stopStatus.set(stops[i].id, "OUT_FOR_DELIVERY");
+      return { position: { lat: stops[i].lat, lng: stops[i].lng, heading: 0, speedMph: 0 }, status: "STOPPED", currentDeliveryId: stops[i].id, etaMinutes: 0, stopStatus, deliveredAt };
+    }
+  }
+
+  // Past the last drop, before the day closes: driving home.
+  const g = legGeom(n);
+  const frac = (now - drop[n - 1]) / Math.max(returnEnd - drop[n - 1], 1);
+  const p = g && g.length >= 2 ? pointAtFraction(g, frac) : atDepot;
+  return { position: { lat: p.lat, lng: p.lng, heading: "heading" in p ? p.heading : 0, speedMph: 24 }, status: "RETURNING", currentDeliveryId: null, etaMinutes: null, stopStatus, deliveredAt };
+}
+
+/**
+ * The dispatch depot: the org's designated depot location (a `locations` row with
+ * coordinates + `is_depot`), else any location with coordinates, else the Austin
+ * fallback. This is where the depot is *configured* - edit that location's
+ * coordinates and the map, routing, and every run's start/end move with it.
+ */
+async function getDepot(ctx: ServiceCtx): Promise<FleetTelemetry["depot"]> {
+  const rows = await db
+    .select({ name: locations.name, lat: locations.lat, lng: locations.lng, address: locations.address, isDepot: locations.isDepot })
+    .from(locations)
+    .where(eq(locations.organizationId, ctx.orgId));
+  const withCoords = rows.filter((r) => r.lat != null && r.lng != null);
+  const chosen = withCoords.find((r) => r.isDepot) ?? withCoords[0];
+  if (chosen) {
+    return { lat: Number(chosen.lat), lng: Number(chosen.lng), name: chosen.name, address: chosen.address ?? null };
+  }
+  return { lat: AUSTIN_DEPOT.lat, lng: AUSTIN_DEPOT.lng, name: "Austin Depot", address: null };
 }
 
 // ---- Helpers -----------------------------------------------------------------
@@ -557,6 +441,18 @@ function todayWindow(): { start: Date; end: Date } {
   const end = new Date(start);
   end.setDate(end.getDate() + 1);
   return { start, end };
+}
+
+/**
+ * The business name captured on a delivery's address snapshot, if any. Order-free
+ * deliveries (bulk-seeded dispatch runs) carry the customer name here since
+ * there's no order→company to join; a real order-backed delivery leaves it unset
+ * and the joined company name wins.
+ */
+function addressName(address: unknown): string | null {
+  if (!address || typeof address !== "object") return null;
+  const n = (address as Record<string, unknown>).name;
+  return typeof n === "string" && n.trim() ? n.trim() : null;
 }
 
 /** Collapse an address snapshot into a one-line label. */

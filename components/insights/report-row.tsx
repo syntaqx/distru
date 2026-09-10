@@ -33,7 +33,7 @@ export function ReportRow({ name, label }: { name: string; label: string }) {
   return (
     <li className="group flex items-center gap-1.5 text-sm">
       <a
-        href={`/public/v1/reports/${name}`}
+        href={`/api/v1/reports/${name}`}
         target="_blank"
         rel="noopener noreferrer"
         className="flex min-w-0 flex-1 items-center gap-1.5 text-info hover:underline"

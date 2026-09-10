@@ -50,7 +50,7 @@ If there were no demo, this is the order to rebuild it. Each step depends only o
 4. **Harness core** - the tool contract and registry, the streaming runner, the HITL persist/resume, the ask_user gate, and an audit write on every mutation.
 5. **Tools** - catalog reads (gate none), mutations (gate confirmation with a preview), the import tools, docs tools, and workflow tools.
 6. **Import framework** - the ImportTarget seam, the detection classifier, the mapping matcher, the chunked pipeline, the error-CSV builder, and the seven targets.
-7. **Faces** - chat NDJSON routes and `/resume`; `/public/v1/*` with Distru conventions; the `/api/mcp` JSON-RPC server; `/api/upload-products`; HMAC-signed webhooks.
+7. **Faces** - chat NDJSON routes and `/resume`; `/api/v1/*` with Distru conventions; the `/api/mcp` JSON-RPC server; `/api/upload-products`; HMAC-signed webhooks.
 8. **Automations** - the workflow tables, the n8n-shaped node-graph model + executor (agent / action / if / set nodes, run against a shared context), `runWorkflow` driving the runner with autoApprove, real cron scheduling (a `tick` endpoint), the produce → deliver → notify loop (`save_report`/`generate_report` artifacts, email/Drive delivery, notifications), and the React Flow canvas + JSON builder.
 9. **App shell** - the context-driven sidebar, the floating Copilot panel, the dashboard, inventory / companies / categories CRUD, docs, and the integrations directory.
 10. **Verify** - typecheck, lint (including the architecture-boundary rules), and a green production build; an offline smoke test that drives the modules and the full import pipeline against Postgres with no model spend; curl each face with a minted token.

@@ -72,7 +72,7 @@ export default async function CoaDetailPage({
                 {coa.passed ?? "NO RESULT"}
               </span>
               <a
-                href={`/public/v1/test-results/${coa.id}/pdf`}
+                href={`/api/v1/test-results/${coa.id}/pdf`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn btn-outline"
