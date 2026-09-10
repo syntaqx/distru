@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { verifyBearerToken } from "@/lib/modules/platform";
 import type { ServiceCtx } from "@/lib/modules/shared";
+import { getOrgContext } from "@/lib/session";
 
 /**
  * Helpers that make our public API byte-for-convention compatible with Distru's
@@ -13,18 +14,30 @@ export type ApiAuth = { ctx: ServiceCtx; scopes: string[] };
 export async function authenticate(
   req: Request,
 ): Promise<ApiAuth | NextResponse> {
+  // 1) Bearer API token (the primary, Distru-compatible path for integrations).
   const token = await verifyBearerToken(req.headers.get("authorization"));
-  if (!token) {
-    return distruError(401, "Missing or invalid API token", ["authorization"], "header");
+  if (token) {
+    return {
+      ctx: {
+        orgId: token.orgId,
+        actor: `api:${token.tokenId}`,
+        actorType: "api",
+      },
+      scopes: token.scopes,
+    };
   }
-  return {
-    ctx: {
-      orgId: token.orgId,
-      actor: `api:${token.tokenId}`,
-      actorType: "api",
-    },
-    scopes: token.scopes,
-  };
+  // 2) Fall back to the signed-in browser session, so a logged-in user can open
+  //    API URLs directly in the browser (or fetch them from the app) and see the
+  //    same data they have access to in the UI - no token required. A session is
+  //    the org's own user, so it carries full scope.
+  const session = await getOrgContext();
+  if (session) {
+    return {
+      ctx: { orgId: session.orgId, actor: session.actor, actorType: "user" },
+      scopes: ["*"],
+    };
+  }
+  return distruError(401, "Missing or invalid API token", ["authorization"], "header");
 }
 
 export function requireScope(auth: ApiAuth, scope: string): NextResponse | null {

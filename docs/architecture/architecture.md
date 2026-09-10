@@ -39,6 +39,17 @@ flowchart TB
     Imp[imports]
     Notif[notifications]
     Kernel[[shared kernel]]
+    %% Invisible links arrange the modules into a compact grid (rows of ~4-5)
+    %% instead of one very wide row.
+    Sales ~~~ Mfg
+    Inv ~~~ Comp
+    Cat ~~~ Cult
+    Purch ~~~ Log
+    Mfg ~~~ Rep
+    Comp ~~~ Plat
+    Cult ~~~ Imp
+    Log ~~~ Notif
+    Rep ~~~ Kernel
   end
   DB[(Postgres · multitenant · UUIDv7)]
   UI --> P1

@@ -14,6 +14,22 @@
  */
 
 /**
+ * The browser-facing origin for the spec's `servers` URL. Derived from the
+ * `Host` / `x-forwarded-*` headers (what the browser actually hit) rather than
+ * `new URL(req.url).origin`, which under a container bound to 0.0.0.0 reports
+ * `http://0.0.0.0:3000` - an address the browser can't reach, so "try it" fails.
+ * Locally this yields http://localhost:3000; on Vercel, https://<your-domain>.
+ */
+export function requestOrigin(req: Request): string {
+  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
+  if (!host) return new URL(req.url).origin;
+  const proto =
+    req.headers.get("x-forwarded-proto") ??
+    (/^(localhost|0\.0\.0\.0|127\.|\[?::1)/.test(host) ? "http" : "https");
+  return `${proto}://${host}`;
+}
+
+/**
  * Public routes intentionally left OUT of the OpenAPI spec. Every other route
  * under app/public/v1 must be documented or the build fails. Use the OpenAPI
  * path form (e.g. "/public/v1/health").

@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowLeft, BookOpen, Settings } from "lucide-react";
+import { ArrowLeft, BookOpen, Braces, Settings } from "lucide-react";
 import type { DocNav } from "@/lib/docs/types";
 import { UserMenu } from "@/components/user-menu";
 import { OrgSwitcher } from "@/components/org-switcher";
@@ -95,7 +95,7 @@ export function Sidebar({
   }, [pathname]);
   const context = pathname.startsWith("/settings")
     ? "settings"
-    : pathname.startsWith("/docs")
+    : pathname.startsWith("/docs") || pathname.startsWith("/api-reference")
       ? "docs"
       : "main";
   // Exactly one main item is active: the most-specific href that owns the path,
@@ -176,6 +176,22 @@ export function Sidebar({
                   <div className="space-y-0.5">
                     <BackHeader label="Docs" />
                     {product.map(docLink)}
+                    {/* The interactive OpenAPI explorer lives alongside the docs. */}
+                    <Link
+                      href="/api-reference"
+                      className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
+                        pathname.startsWith("/api-reference")
+                          ? "text-fg"
+                          : "text-muted hover:bg-surface2 hover:text-fg"
+                      }`}
+                      style={
+                        pathname.startsWith("/api-reference")
+                          ? { background: "var(--color-surface2)" }
+                          : undefined
+                      }
+                    >
+                      <Braces size={15} className="shrink-0" /> API reference
+                    </Link>
                   </div>
                   {engineering.length > 0 && (
                     <div className="space-y-6 border-t pt-5">
