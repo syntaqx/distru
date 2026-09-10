@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Trash2 } from "lucide-react";
+import { ArrowLeft, Trash2 } from "lucide-react";
 import { Select } from "@/components/ui/select";
 import { Combobox } from "@/components/ui/combobox";
 import { nodeSpec } from "@/lib/harness/graph/catalog";
@@ -16,11 +16,13 @@ export function NodeConfig({
   tools,
   onChange,
   onDelete,
+  onClose,
 }: {
   node: WorkflowNode;
   tools: ToolMeta[];
   onChange: (patch: Patch) => void;
   onDelete: () => void;
+  onClose?: () => void;
 }) {
   const spec = nodeSpec(node.type);
   const p = node.params as Record<string, unknown>;
@@ -32,8 +34,19 @@ export function NodeConfig({
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between border-b px-4 py-3">
-        <div className="min-w-0">
-          <div className="text-xs uppercase tracking-wide text-muted">{spec?.label ?? node.type}</div>
+        <div className="flex min-w-0 items-center gap-1.5">
+          {onClose && (
+            <button
+              className="btn btn-ghost px-2 md:hidden"
+              onClick={onClose}
+              aria-label="Back to canvas"
+            >
+              <ArrowLeft size={16} />
+            </button>
+          )}
+          <div className="min-w-0">
+            <div className="text-xs uppercase tracking-wide text-muted">{spec?.label ?? node.type}</div>
+          </div>
         </div>
         <button className="btn btn-ghost px-2" title="Delete node" onClick={onDelete}>
           <Trash2 size={15} />

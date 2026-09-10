@@ -72,6 +72,9 @@ function Canvas({
   const [jsonText, setJsonText] = useState("");
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  // On mobile the node palette is a slide-in drawer (it can't permanently eat
+  // half the narrow canvas); on md+ it's a fixed sidebar.
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const { screenToFlowPosition } = useReactFlow();
   const paletteRef = useRef<HTMLDivElement>(null);
 
@@ -168,6 +171,7 @@ function Canvas({
       };
       setNodes((ns) => ns.concat(newNode));
       setSelectedId(id);
+      setPaletteOpen(false); // close the mobile drawer after picking a node
       markDirty();
     },
     [screenToFlowPosition, setNodes, markDirty],
@@ -289,8 +293,26 @@ function Canvas({
 
   return (
     <div className="relative flex h-full min-h-0">
-      {/* Palette */}
-      <div ref={paletteRef} className="w-44 shrink-0 overflow-auto border-r p-2">
+      {/* Palette: a fixed sidebar on desktop, a slide-in drawer on mobile. */}
+      {paletteOpen && (
+        <div
+          className="absolute inset-0 z-20 bg-black/30 md:hidden"
+          onClick={() => setPaletteOpen(false)}
+          aria-hidden
+        />
+      )}
+      <div
+        ref={paletteRef}
+        className={`shrink-0 overflow-auto border-r bg-surface p-2 md:static md:z-auto md:block md:w-44 md:shadow-none ${
+          paletteOpen ? "absolute inset-y-0 left-0 z-30 w-56 shadow-xl" : "hidden"
+        }`}
+      >
+        <div className="mb-2 flex items-center justify-between md:hidden">
+          <span className="px-1 text-xs font-semibold">Add a node</span>
+          <button className="btn btn-ghost px-2 py-1" onClick={() => setPaletteOpen(false)} aria-label="Close">
+            <X size={15} />
+          </button>
+        </div>
         {(["Triggers", "Steps", "Sub-nodes"] as const).map((group) => (
           <div key={group} className="mb-3">
             <div className="px-1 pb-1 text-[10px] font-semibold uppercase tracking-wide text-muted">
@@ -329,6 +351,8 @@ function Canvas({
           onNodeClick={(_, n) => setSelectedId(n.id)}
           onPaneClick={() => setSelectedId(null)}
           fitView
+          minZoom={0.2}
+          zoomOnPinch
           proOptions={{ hideAttribution: true }}
         >
           <Background gap={16} color="var(--color-border)" />
@@ -336,11 +360,18 @@ function Canvas({
         </ReactFlow>
 
         {/* Toolbar */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center gap-2 p-3">
-          <div className="pointer-events-auto rounded-xl border bg-surface p-1 shadow-sm">
+        <div className="pointer-events-none absolute inset-x-0 top-0 flex flex-wrap items-center gap-2 p-3">
+          <div className="pointer-events-auto flex items-center gap-1 rounded-xl border bg-surface p-1 shadow-sm">
+            {/* Mobile-only: open the node palette drawer. */}
+            <button
+              className="btn btn-ghost px-2 py-1 text-xs md:hidden"
+              onClick={() => setPaletteOpen(true)}
+            >
+              <Plus size={14} /> Nodes
+            </button>
             <ModeToggle mode="visual" onVisual={() => {}} onJson={enterJson} />
           </div>
-          <div className="pointer-events-auto ml-auto flex items-center gap-2 rounded-xl border bg-surface p-1.5 shadow-sm">
+          <div className="pointer-events-auto ml-auto flex flex-wrap items-center gap-2 rounded-xl border bg-surface p-1.5 shadow-sm">
             {errorCount > 0 ? (
               <span className="px-2 text-xs text-danger">{errorCount} issue{errorCount === 1 ? "" : "s"}</span>
             ) : savedAt ? (
@@ -361,15 +392,16 @@ function Canvas({
         </div>
       </div>
 
-      {/* Config panel */}
+      {/* Config panel: full-screen sheet on mobile, fixed side panel on desktop. */}
       {selected && (
-        <div className="absolute inset-y-0 right-0 z-10 w-full border-l bg-surface md:static md:w-80 md:shrink-0">
+        <div className="absolute inset-y-0 right-0 z-40 w-full border-l bg-surface md:static md:w-80 md:shrink-0">
           <NodeConfig
             key={selected.id}
             node={selected}
             tools={tools}
             onChange={(patch) => patchNode(selected.id, patch)}
             onDelete={() => deleteNode(selected.id)}
+            onClose={() => setSelectedId(null)}
           />
         </div>
       )}
