@@ -12,7 +12,7 @@
     "maplibre:worker": "node scripts/copy-maplibre-worker.mjs",
     "prebuild": "npm run build:docs && npm run check:openapi && npm run maplibre:worker",
     "build": "next build",
-    "vercel-build": "npm run db:push && npm run db:reset && npm run build",
+    "vercel-build": "npm run build:docs && npm run db:push && npm run db:reset && npm run build",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
