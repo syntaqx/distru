@@ -1,0 +1,73 @@
+name: Reset staging DB
+
+# Keeps the live sandbox ("production" — a throwaway demo DB) fresh by hitting
+# the double-gated reset endpoint (/api/staging/reset), which does a full purge +
+# reseed of the demo tenant. This runs from GitHub Actions instead of relying only
+# on Vercel Cron, because Vercel Cron fires silently and gives no failure signal —
+# a skipped nightly run (the reason this workflow exists) went unnoticed for days.
+# A failed run here shows up in the Actions tab and emails the repo owner.
+#
+# Requirements (one-time setup — see README "Deploy"):
+#   - Repo Actions secret CRON_SECRET, matching CRON_SECRET on the Vercel project.
+#   - ENABLE_STAGING_RESET=1 + CRON_SECRET set on the Vercel production env.
+#   - Optional repo Actions variable APP_URL to override the origin below.
+
+on:
+  # Nightly. GitHub schedules run in UTC and can be delayed under load; 08:00 UTC
+  # is ~midnight US Pacific. Adjust to taste. (Note: GitHub disables scheduled
+  # workflows after 60 days with no repo activity — pushes reset that clock.)
+  schedule:
+    - cron: "0 8 * * *"
+
+  # On every push to main: reset once the new code is actually live. Vercel's
+  # `vercel-build` already resets during the deploy itself; this fires only after
+  # Vercel reports the Production deployment succeeded, so the sandbox lands on a
+  # fresh tenant built from the just-deployed code — and it's visible here.
+  # (If your Vercel project doesn't emit GitHub deployment events, `vercel-build`
+  # still covers the push reset; swap this for `push: { branches: [main] }`.)
+  deployment_status:
+
+  # "Reset now" button in the Actions tab.
+  workflow_dispatch:
+
+# Never let two resets (e.g. a deploy and the nightly) overlap and fight over the
+# same tables; the newest wins, older queued runs are cancelled.
+concurrency:
+  group: reset-staging
+  cancel-in-progress: true
+
+jobs:
+  reset:
+    # For deployment_status, only act on a *successful* *Production* deploy —
+    # skip previews and in-progress/failed states. Other triggers always run.
+    if: >
+      github.event_name != 'deployment_status' ||
+      (github.event.deployment_status.state == 'success' &&
+       github.event.deployment_status.environment == 'Production')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Purge + reseed the demo tenant
+        env:
+          RESET_URL: ${{ vars.APP_URL || 'https://distru.syntaqx.com' }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CRON_SECRET}" ]; then
+            echo "::error::CRON_SECRET repo secret is not set — add it in Settings > Secrets and variables > Actions (must match Vercel's CRON_SECRET)."
+            exit 1
+          fi
+          echo "POST ${RESET_URL}/api/staging/reset"
+          # The reset does many inserts + a better-auth signup (endpoint maxDuration
+          # is 300s); allow room and retry transient/cold-start failures.
+          code=$(curl -sS -X POST "${RESET_URL}/api/staging/reset" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            --max-time 340 --retry 3 --retry-delay 20 --retry-all-errors \
+            -o response.json -w "%{http_code}")
+          echo "HTTP ${code}"
+          cat response.json 2>/dev/null || true
+          echo
+          if [ "${code}" != "200" ]; then
+            echo "::error::Staging reset failed (HTTP ${code}). Check CRON_SECRET match and ENABLE_STAGING_RESET=1 on Vercel."
+            exit 1
+          fi
+          echo "Staging reset OK."

@@ -145,7 +145,13 @@ Details and the config-JSON form: **Docs → Copilot & take-home → One capabil
 
 Optional: `ANTHROPIC_MODEL` (default `claude-opus-5`), `MODEL_PROVIDER=openai` + `OPENAI_API_KEY` to run on OpenAI, and the integration seams (`METRC_PROVIDER`, `EMAIL_PROVIDER`, `DRIVE_PROVIDER`, …; all default `mock`, set `none` to show unconnected). `CRON_SECRET` enables the scheduled-automation cron ([`vercel.json`](./vercel.json)).
 
-**This is a demo deployment.** `vercel-build` runs `db:push` then **`db:reset`** (a full purge + reseed) before `next build`, so every deploy comes up on the latest schema with a fresh demo tenant — and a nightly cron does the same (`ENABLE_STAGING_RESET=1` + `CRON_SECRET`). Point it only at a throwaway database.
+**This is a demo deployment.** `vercel-build` runs `db:push` then **`db:reset`** (a full purge + reseed) before `next build`, so every deploy comes up on the latest schema with a fresh demo tenant. Point it only at a throwaway database.
+
+**Staying fresh** is driven by a GitHub Action ([`.github/workflows/reset-staging.yml`](./.github/workflows/reset-staging.yml)) that POSTs the double-gated reset endpoint (`/api/staging/reset`): **nightly** (08:00 UTC), **after each successful `main` deploy**, and **on demand** (the "Reset now" button in the Actions tab). It runs from Actions rather than Vercel Cron so a skipped run is visible and emails you — a silent Vercel Cron miss is why nightly resets stopped without warning. Vercel Cron is still wired in [`vercel.json`](./vercel.json) as a redundant backup. One-time setup:
+
+- Add a repo **Actions secret** `CRON_SECRET` (Settings → Secrets and variables → Actions) with the **same value** as the Vercel project's `CRON_SECRET`.
+- On the Vercel production env, set `ENABLE_STAGING_RESET=1` and `CRON_SECRET`.
+- If the deployed origin isn't `https://distru.syntaqx.com`, set a repo **Actions variable** `APP_URL` to it.
 
 ---
 
