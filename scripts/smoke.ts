@@ -70,7 +70,7 @@ async function main() {
 
   console.log("\n3. Import pipeline (messy CSV → map → validate → commit)");
   const buffer = readFileSync("samples/messy-catalog.csv");
-  const parsed = parseTabular({
+  const parsed = await parseTabular({
     filename: "messy-catalog.csv",
     contentType: "text/csv",
     buffer,

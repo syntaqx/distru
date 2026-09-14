@@ -42,7 +42,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "no file" }, { status: 400 });
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const parsed = parseTabular({ filename: file.name, contentType: file.type, buffer });
+  const parsed = await parseTabular({ filename: file.name, contentType: file.type, buffer });
   if (parsed.headers.length === 0)
     return NextResponse.json({ error: "could not parse headers" }, { status: 400 });
 

@@ -1,0 +1,41 @@
+name: Dependabot auto-merge
+
+# Auto-merges Dependabot PRs once they're mergeable. Scope is deliberately
+# conservative — only patch and minor bumps merge on their own; majors (the
+# breaking-risk ones) stay open for a human to review and merge.
+#
+# For a merge to actually WAIT on CI, `main` needs the CI check marked as a
+# required status check (a branch ruleset). With auto-merge enabled on the repo
+# and that check required, `gh pr merge --auto` queues the PR and GitHub merges
+# it only after CI goes green. Without a required check it would merge as soon as
+# it's mergeable — see the repo README / setup notes.
+# Docs: https://docs.github.com/en/code-security/tutorials/secure-your-dependencies/automate-dependabot-with-actions
+
+on: pull_request
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  dependabot:
+    runs-on: ubuntu-latest
+    # Only ever act on PRs opened by Dependabot.
+    if: ${{ github.actor == 'dependabot[bot]' }}
+    steps:
+      - name: Fetch Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v3.1.0
+        with:
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+      # For a grouped PR, update-type is the highest bump in the group, so a group
+      # containing any major will NOT match here and stays for manual review.
+      - name: Enable auto-merge for patch & minor updates
+        if: >
+          steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
+          steps.metadata.outputs.update-type == 'version-update:semver-minor'
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

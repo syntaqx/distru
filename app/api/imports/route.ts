@@ -26,7 +26,7 @@ export async function POST(req: Request) {
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const parsed = parseTabular({
+  const parsed = await parseTabular({
     filename: file.name,
     contentType: file.type,
     buffer,

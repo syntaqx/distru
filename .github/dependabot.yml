@@ -1,0 +1,64 @@
+version: 2
+
+updates:
+  # ---------------------------------------------------------------------------
+  # npm packages
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    # Grouping: packages that are released together (or must share a major to
+    # even install) go in one PR so they're bumped in lockstep instead of racing
+    # each other through separate, individually-broken PRs.
+    groups:
+      # React runtime + its type packages must always move together.
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+      # next and eslint-config-next ship on the same version line (16.3.x ...).
+      next:
+        patterns:
+          - "next"
+          - "eslint-config-next"
+      # Radix primitives share a release cadence.
+      radix-ui:
+        patterns:
+          - "@radix-ui/*"
+      # Vitest core and its coverage provider must share a major.
+      vitest:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
+      # Everything else: batch the low-risk minor/patch bumps into a single PR to
+      # cut noise. Majors of ungrouped deps still get their own PR for review
+      # (a human looks before a breaking change lands).
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      # eslint-config-next bundles typescript-eslint + eslint-plugin-react, and
+      # neither supports TypeScript 7 / ESLint 10 yet — those majors break
+      # `npm run lint` (verified). Skip the noise until eslint-config-next catches
+      # up, then delete these two ignores to let the majors flow through.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
+
+  # ---------------------------------------------------------------------------
+  # GitHub Actions used by workflows in .github/workflows
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      actions:
+        patterns:
+          - "*"
