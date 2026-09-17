@@ -4,7 +4,13 @@
 
 A multitenant, Vercel-deployable recreation of the [Distru](https://distru.com) cannabis ERP with an AI **Copilot** on top — a chat assistant that actually runs your catalog, inventory, sales, and manufacturing. Built as a take-home ("we are Distru").
 
-> **Reviewers:** get it running below, then read the deep docs — the graded deliverables (the tech spec and the Loom script) live under [`docs/`](./docs/) and render in-app at **`/docs`** once you spin it up. This README is the on-ramp, not the spec; it points you at the docs rather than repeating them.
+> **Reviewers — start here:**
+>
+> - **It's live:** [**distru.syntaqx.com**](https://distru.syntaqx.com) — sign in with `demo@distru.test` / `distru1234` (pre-filled) and poke around. No setup required; every new sign-up gets its own seeded workspace too.
+> - **The graded deliverable is the spec:** the deep docs under [`docs/`](./docs/), which also render in-app at **`/docs`**. Start with the [**take-home brief & answer**](./docs/architecture/take-home.md), then [the harness](./docs/architecture/harness.md), [the import pipeline](./docs/architecture/import-pipeline.md), and [model economics](./docs/architecture/model-economics.md).
+> - **Want to run it yourself?** Quickstart is right below.
+>
+> This README is the on-ramp, not the spec — it points you at the docs rather than repeating them.
 
 ---
 
@@ -115,7 +121,7 @@ All docs are markdown under [`docs/`](./docs/) and render in-app at **`/docs`** 
 - **Product docs** ([`docs/product/`](./docs/product/)) — how each module works, operator-facing.
 - **Engineering & take-home** ([`docs/architecture/`](./docs/architecture/)) — the tech spec, in two groups:
   - *Platform architecture* — [architecture overview](./docs/architecture/architecture.md), [modular architecture](./docs/architecture/modular-architecture.md), [data model](./docs/architecture/data-model.md), [the Distru domain](./docs/architecture/distru-domain.md), [the inventory engine](./docs/architecture/inventory-engine.md), [fidelity audit](./docs/architecture/fidelity.md).
-  - *Copilot & take-home* — [the harness](./docs/architecture/harness.md), [one capability, two faces](./docs/architecture/two-faces.md), [the import pipeline](./docs/architecture/import-pipeline.md), [the workflow engine](./docs/architecture/workflow-engine.md), [decisions & scope](./docs/architecture/building.md), [take-home answer](./docs/architecture/take-home.md), and the **[Loom script](./docs/architecture/loom.md)**.
+  - *Copilot & take-home* — [the harness](./docs/architecture/harness.md), [one capability, two faces](./docs/architecture/two-faces.md), [the import pipeline](./docs/architecture/import-pipeline.md), [the workflow engine](./docs/architecture/workflow-engine.md), [decisions & scope](./docs/architecture/building.md), [model economics](./docs/architecture/model-economics.md), and the [take-home answer](./docs/architecture/take-home.md).
 
 Agents get first-class entry points generated from the same docs: [`/llms.txt`](http://localhost:3000/llms.txt), [`/llms-full.txt`](http://localhost:3000/llms-full.txt), and [`/skill.md`](http://localhost:3000/skill.md).
 

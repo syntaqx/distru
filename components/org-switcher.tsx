@@ -45,19 +45,30 @@ export function OrgSwitcher({ initialName }: { initialName: string }) {
 
   return (
     <div className="relative w-full">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-surface2"
-      >
-        <span
-          className="grid size-6 shrink-0 place-items-center rounded-md text-[11px] font-semibold"
-          style={{ background: "var(--color-accent)", color: "var(--color-accentfg)" }}
+      <div className="flex w-full items-center gap-1">
+        <button
+          onClick={() => router.push("/dashboard")}
+          title="Go to dashboard"
+          className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-surface2"
         >
-          {initials(activeName)}
-        </span>
-        <span className="min-w-0 flex-1 truncate text-sm font-medium">{activeName}</span>
-        <ChevronsUpDown size={14} className="text-muted" />
-      </button>
+          <span
+            className="grid size-6 shrink-0 place-items-center rounded-md text-[11px] font-semibold"
+            style={{ background: "var(--color-accent)", color: "var(--color-accentfg)" }}
+          >
+            {initials(activeName)}
+          </span>
+          <span className="min-w-0 flex-1 truncate text-sm font-medium">{activeName}</span>
+        </button>
+        <button
+          onClick={() => setOpen((v) => !v)}
+          aria-label="Switch workspace"
+          aria-expanded={open}
+          title="Switch workspace"
+          className="shrink-0 rounded-lg p-1.5 text-muted transition-colors hover:bg-surface2"
+        >
+          <ChevronsUpDown size={14} />
+        </button>
+      </div>
 
       {open && (
         <>
