@@ -42,7 +42,7 @@
     "@xyflow/react": "^12.11.6",
     "@zxing/browser": "^0.2.1",
     "@zxing/library": "^0.23.0",
-    "better-auth": "^1.7.4",
+    "better-auth": "^1.7.5",
     "date-fns": "^4.4.0",
     "drizzle-orm": "^0.45.2",
     "exceljs": "^4.4.0",
