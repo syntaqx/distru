@@ -52,7 +52,7 @@
     "next": "16.4.4",
     "nodemailer": "^10.3.1",
     "papaparse": "^5.7.0",
-    "postgres": "^3.4.9",
+    "postgres": "^4.0.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "shiki": "^4.6.0",
