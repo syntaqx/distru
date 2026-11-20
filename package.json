@@ -39,7 +39,7 @@
     "@radix-ui/react-select": "^2.4.1",
     "@radix-ui/react-tooltip": "^1.4.1",
     "@scalar/api-reference-react": "^0.9.91",
-    "@xyflow/react": "^12.12.1",
+    "@xyflow/react": "^13.0.1",
     "@zxing/browser": "^0.2.1",
     "@zxing/library": "^0.23.0",
     "better-auth": "^1.7.25",
